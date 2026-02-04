@@ -5,26 +5,815 @@ date: "2026-02-04"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## Loading libraries
+
+```{r}
+
+library(terra)
+
+library(ggplot2)
+
+library(tidyterra)
+
+library(sf)
+
+library(gridExtra)
+
+library(ggspatial)
+
+library(cowplot)
+
+library(ggtext)
+
+library(xfun)
+
+library(patchwork)
+
+library(dplyr)
+
+library(grid)
+
 ```
 
-## R Markdown
+## Prepare a reference raster and a mask with Europe's borders
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Import the raster of human population and of Europe's border to have the reference raster regarding crs, ext and res (ie the population raster is the reference one)
 
-```{r cars}
-summary(cars)
+# Import population raster nut ditinguisg inland (should be 0) and oceans (should be NA)
+
+# Step 1: Load the population raster and coastline shapefile
+raster_1km_human_population_path <- "S:/Magali_Weissgerber/human_population_scratch/JRC_1K_POP_2018.tif" # Read the 1km resolution raster
+raster_1km_human_population <- rast(raster_1km_human_population_path)
+plot(raster_1km_human_population)
+
+# Import Europe's borders
+inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
+plot(inland_shapefile)
+
+# Check the type of the raster object
+class(raster_1km_human_population)
+
+# Check if the raster object is valid
+print(raster_1km_human_population)
+
+# Ensure the CRS is consistent
+crs(raster_1km_human_population) <- "EPSG:3035"
+# Check and reproject the shapefile to match the CRS of the raster
+if (crs(inland_shapefile) != crs(raster_1km_human_population)) {
+  inland_shapefile <- st_transform(inland_shapefile, crs(raster_1km_human_population))
+}
+
+# Step 2: Create a mask from the coastline shapefile
+# Rasterize the coastline shapefile to create a mask
+inland_raster <- rasterize(vect(inland_shapefile), raster_1km_human_population, field = 1, background = NA)
+plot(inland_raster)
+
+# Step 3: Preprocess the population raster
+# Replace inland NA values with 0
+population_preprocessed <- raster_1km_human_population
+values(population_preprocessed)[is.na(values(population_preprocessed)) & !is.na(values(inland_raster))] <- 0
+plot(population_preprocessed)
+
+#Rename
+raster_1km_human_population <- population_preprocessed
+
+#Export
+#output_population_preprocessed <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/population_masked_ocean_240723.tif")
+#writeRaster(raster_1km_human_population, output_population_preprocessed, overwrite=TRUE)
+
 ```
 
-## Including Plots
+## Step 1 - determining the expansion probability of large mammals
 
-You can also embed plots, for example:
+We are using the wildlife maps from the Rewild Europe Report (Fernández, N., Torres, A., Wolf, F., Quintero, L., & Pereira, H. M. (2020). Boosting Ecological Restoration for a Wilder Europe. Halle-Wittenberg: German Centre for Integrative Biodiversity Research (iDiv) and Martin-Luther-Universität.)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+They include Alpine ibex, Brown bear, Chamois, Elk, European bison, European lynx, European wolf, Iberian ibex, Iberian lynx, Pyrenean chamois, Red deer, Reindeer, Roe deer, Wild boar, Wild goat.
+We will focus on Brown bear, Elk, European bison, European wolf, European lynx, Iberian lynx, Iberian ibex, Alpine ibex.
+
+We want to know the probability that cells not containing the focus species will gain that species. Here are the different steps.
+For each species
+1) Occurrences are coded as 0 = species absent, 1 = species present and 9 = species maybe present. We are changing all the 9 into 0.
+2) Get the distance of every 0 to the closest 1
+3) Calculate probability of colonization (form K/e^-xdistance)
+Then
+4) Sum the probability (Optional)
+
+A parallel processing was added to rasterize the data directly and change the resolution from 10km to 1km, and calculate distance then.
+
+### Import and check data; change to binary
+
+```{r}
+
+SPECIES_OCC_initial_fishnet <-  st_read("S:/Magali_Weissgerber/Species_dist_occ_scratch/SP_OCCU_190207.shp")
+
+head(SPECIES_OCC_initial_fishnet)
+names(SPECIES_OCC_initial_fishnet)
+
+ggplot(SPECIES_OCC_initial_fishnet) + 
+  geom_sf(aes(fill = M_CANLUP), color = NA) +
+  scale_fill_viridis_c(option = "magma",begin = 0.2)
+
+SPECIES_OCC_binary_fishnet <- SPECIES_OCC_initial_fishnet #new dataset to be modified
+  
+# Change 9 into 0
+  for(j in 4:20)
+    set(SPECIES_OCC_binary_fishnet, i = which(SPECIES_OCC_binary_fishnet[[j]] == 9), j = j, value = 0)
+
+#Plot one species to check
+ggplot(SPECIES_OCC_binary_fishnet) + 
+  geom_sf(aes(fill = M_CANLUP), color = NA) +
+  scale_fill_viridis_c(option = "magma",begin = 0.2)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+### Rasterize, create distance raster and calculate probability of expansion
+
+Calculate probability of colonization (form K/e^-xdistance) (when distance = 0 it means the species is already there so probability is also 0). 
+Initially we used 1/exp((log(2)/50) distance) so to have 50% of probability of comeback at 50km. But based on Canis lupus dispersal values we apply rather 1/exp((log(2)/60) distance) (as the cells of the mammals ditribution are 10x10km the probability max is 0.89)
+
+```{r}
+
+# Rasterize the shapefile. It becomes a stack raster with the 8 species of interest
+
+# Define the extent and resolution for the raster
+extent_raster <- terra::ext(SPECIES_OCC_binary_fishnet)
+res <- 10000  # Define your desired resolution
+# Create an empty raster with the defined extent and resolution
+r <- terra::rast(extent_raster, resolution = res, crs = crs(SPECIES_OCC_binary_fishnet))
+# List of columns to rasterize
+columns_to_rasterize <- c("M_CANLUP", "M_ALCALC", "M_BISBON", "M_LYNLYN", "M_URSARC", "M_LYNPAR", "M_CAPIBE", "M_CAPPYR")
+# Initialize an empty list to store rasters
+rasters <- list()
+# Loop through each column and rasterize
+for (col in columns_to_rasterize) {
+    r <- rasterize(SPECIES_OCC_binary_fishnet, r, field = col)
+    rasters[[col]] <- r
+}
+# Stack all rasters
+raster_10km_wildlife_occupancy_stack <- rast(rasters)
+plot(raster_10km_wildlife_occupancy_stack)
+
+# Change the resolution of the wildlife raster 
+
+# Check the original raster resolutions
+print(res(raster_10km_wildlife_occupancy_stack))
+print(res(raster_1km_human_population))
+
+# Resample the 10km raster to 1km resolution using nearest neighbor method
+raster_1km_wildlife_occupancy_stack <- resample(raster_10km_wildlife_occupancy_stack, raster_1km_human_population, method = "ngb")
+
+# Check the resampled raster resolution
+print(res(raster_1km_wildlife_occupancy_stack))
+
+# Plot raster
+plot(raster_1km_wildlife_occupancy_stack)
+
+# Sum the occupancy (for illustrative maps)
+raster_1km_wildlife_occupancy_stack$M_sum <- app(raster_1km_wildlife_occupancy_stack, sum)
+plot(raster_1km_wildlife_occupancy_stack)
+
+#Export
+#output_file_occupancy <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_occupancy_250106.tif")
+#writeRaster(raster_1km_wildlife_occupancy_stack, output_file_occupancy, overwrite=TRUE)
+
+# let's produce the distance raster for each species (it can take 7h per species to process)
+
+# 1. Create list of species rasters
+
+species_list <- list(
+  CANLUP = raster_1km_wildlife_occupancy_stack$M_CANLUP,
+  ALCALC = raster_1km_wildlife_occupancy_stack$M_ALCALC,
+  BISBON = raster_1km_wildlife_occupancy_stack$M_BISBON,
+  LYNLYN = raster_1km_wildlife_occupancy_stack$M_LYNLYN,
+  URSARC = raster_1km_wildlife_occupancy_stack$M_URSARC,
+  LYNPAR = raster_1km_wildlife_occupancy_stack$M_LYNPAR,
+  CAPIBE = raster_1km_wildlife_occupancy_stack$M_CAPIBE,
+  CAPPYR = raster_1km_wildlife_occupancy_stack$M_CAPPYR
+)
+
+# 2. Function to process species (no export)
+
+process_species <- function(r, species_name) {
+  message("Processing species: ", species_name)
+
+  # Step 1: Clean raster (replace NaN with NA)
+  r_clean <- classify(r, matrix(c(NaN, NA), ncol = 2, byrow = TRUE))
+  r_clean <- mask(r_clean, r_clean)
+
+  # Step 2: Check unique values
+  message("Unique values in cleaned raster:")
+  print(unique(values(r_clean)))
+
+  # Step 3: Extract presence cells (value = 1)
+  pts <- as.points(r_clean, values = TRUE, na.rm = TRUE)
+  pts <- pts[pts[[1]] == 1, ]
+
+  # Step 4: Compute distance raster (km)
+  dist_r <- distance(r_clean, pts, unit = "km")
+
+  # Optional plot
+  plot(dist_r, main = paste0("Distance Raster: ", species_name))
+
+  # Return list of outputs
+  return(list(
+    cleaned_raster = r_clean,
+    points = pts,
+    distance_raster = dist_r
+  ))
+}
+
+# 3. Function to export a processed species output
+
+export_species <- function(distance_raster, species_name, output_dir) {
+
+  # Build filename with date
+  output_file <- file.path(
+    output_dir,
+    paste0("dist_", species_name, "_", format(Sys.Date(), "%y%m%d"), ".tif")
+  )
+
+  writeRaster(distance_raster, output_file, overwrite = TRUE)
+  message("Exported: ", output_file)
+}
+
+# 4. Apply processing to all species (no export happens here)
+
+processed_results <- mapply(
+  FUN  = process_species,
+  r    = species_list,
+  species_name = names(species_list),
+  SIMPLIFY = FALSE
+)
+
+# 5. Export only when you choose
+
+output_directory <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding"
+
+# Example: Export LYNPAR and CAPIBE
+export_species(processed_results$LYNPAR$distance_raster, "LYNPAR", output_directory)
+export_species(processed_results$CAPIBE$distance_raster, "CAPIBE", output_directory)
+
+# Next import 
+
+# 1. List species names
+
+species_names <- c("M_CANLUP", "M_ALCALC", "M_BISBON", "M_LYNLYN", "M_URSARC", "M_LYNPAR", "M_CAPIBE", "M_CAPPYR")
+# Directory where files were exported
+input_dir <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding"
+
+# 2. Create a function: import + plot + mask + return
+
+import_and_mask_species <- function(species, input_dir, inland_raster) {
+  
+  # Find the correct file automatically (matching species name)
+  file_pattern <- paste0("dist_", species, "_")
+  file_path <- list.files(input_dir, pattern = file_pattern, full.names = TRUE)
+  
+  if (length(file_path) == 0) {
+    stop("No file found for species: ", species)
+  }
+  
+  message("Importing raster for: ", species)
+  
+  # Import
+  r <- rast(file_path)
+  plot(r, main = paste("Imported Distance Raster:", species))
+  
+  # Mask
+  r_masked <- mask(r, inland_raster)
+  plot(r_masked, main = paste("Masked Distance Raster:", species))
+  
+  return(r_masked)
+}
+
+# 3. Apply this function to all species automatically
+
+masked_rasters <- lapply(
+  species_names,
+  import_and_mask_species,
+  input_dir = input_dir,
+  inland_raster = inland_raster
+)
+
+# The list will be named for convenience:
+names(masked_rasters) <- species_names
+
+# Check results
+
+masked_rasters$LYNPAR
+masked_rasters$CAPIBE
+masked_rasters$CAPPYR
+
+# Then, calculate probability for expansion (based on distance to 1)
+
+# Step 1: Define the transformation function
+probability_function <- function(distance) {
+  ifelse(distance == 0, 
+         0, 
+         1 / exp((log(2) / 60) * distance))
+}
+
+
+# Apply the function to each raster in the stack
+species_probability_stack <- app(species_stack, probability_function)
+
+# Rename the rasters: replace "M_" with "P_" in layer names (the distribution fields are called M_CANLUP, etc)
+old_names <- names(masked_rasters)               # Get original names
+new_names <- gsub("^M_", "P_", old_names)       # Replace "M_" with "P_"
+names(species_probability_stack) <- new_names   # Assign new names to result_stack
+
+# Calculate the sum of the 8 species rasters
+sum_raster <- sum(species_probability_stack)
+
+# Rename the sum raster
+names(sum_raster) <- "P_SUM"
+
+# Add the sum raster to the stack
+species_probability_stack_2 <- c(species_probability_stack, sum_raster)
+
+# Plot results
+plot(species_probability_stack_2)
+
+#Export
+output_file_Proba <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_expansion_probability_250106.tif")
+writeRaster(species_probability_stack_2, output_file_Proba, overwrite=TRUE)
+
+
+```
+
+## Step 2 - determining social benefit
+
+We look at people's willingness-To-Travel (WTT) to see wildlife.
+WTT is distributed among people, we use this distribution to determine the relation between distance to a cell and the share of people in the surrounding cells that will travel. Use the complementary lognormal CDF function (1 - CDF) and the density of people in a convolution to determine the amount of people going to one cell.
+
+# Prepare rasters
+
+```{r}
+
+# The human population raster has been pre processes already 
+plot(raster_1km_human_population)
+
+# Downscale the current occupancy + probability (10km) raster to match human population (1km)
+
+# Current occupancy + probability
+
+# Check the original raster resolutions
+print(res(raster_10km_wildlife_current_probability))
+print(res(raster_1km_human_population))
+
+# Resample the 10km raster to 1km resolution to match the 1km raster
+raster_1km_wildlife_current_probability_stack<- resample(raster_10km_wildlife_current_probability, raster_1km_human_population, method = "bilinear")
+
+# Check the resampled raster resolution
+print(res(raster_1km_wildlife_current_probability_stack))
+
+#Plot raster
+plot(raster_1km_wildlife_current_probability_stack)
+
+# Sum the probability (for illustrative maps)
+raster_1km_wildlife_current_probability_stack$MP_sum <- app(raster_1km_wildlife_current_probability_stack, sum)
+plot(raster_1km_wildlife_current_probability_stack)
+
+#Export
+output_file_MP <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_OCCU_current_probability_241212.tif")
+writeRaster(raster_1km_wildlife_current_probability_stack, output_file_MP, overwrite=TRUE)
+
+# We look at people's willingness-To-Travel to see wildlife Possibility: we exclude rural areas because they mostly have negative opinions of wildlife comeback. 
+# Create a new raster (threshold can be applied now, the current version has no threshold)
+raster_1km_human_population_threshold <- raster_1km_human_population
+
+```
+
+# Calculate the number of people travelling based on the WTT
+
+For large carnivores
+
+```{r}
+
+# Step 1: create the kernel matrix
+
+# Step 1.1: Define matrix dimensions and create the distance matrix
+nrows <- nrow(raster_1km_human_population_threshold)
+ncols <- ncol(raster_1km_human_population_threshold)
+x_coords <- matrix(rep(seq(1, ncols), each = nrows), nrow = nrows, ncol = ncols)
+y_coords <- matrix(rep(seq(1, nrows), times = ncols), nrow = nrows, ncol = ncols)
+center_x <- ncols / 2
+center_y <- nrows / 2
+distance_matrix_LC <- sqrt((x_coords - center_x)^2 + (y_coords - center_y)^2)
+
+# Step 1.2: Define parameters for the lognormal kernel
+mu <- -2.23846
+sigma <- 1.000746
+
+# Step 1.3: Create the lognormal kernel matrix
+kernel_matrix_LC <- dlnorm(distance_matrix_LC, meanlog = mu, sdlog = sigma)
+
+# Step 1.4: Check the dimensions and a small portion of the matrix
+dim(kernel_matrix_LC)
+print("Top-left corner of the matrix:")
+print(kernel_matrix_LC[1:10, 1:10])  # Displaying the top-left 10x10 cells
+
+#Step 2: create the population matrix (the ocean's 0 were masked and change to NAs previously because convolution was done in the spatial domain, with this faster method using fourier transform the NAs have to be set back to 0 for the matrix, yet I kept it that way)
+
+#Step 2.1: create an identifcal raster and print basic information about the raster
+raster_1km_human_population_threshold_2 <- raster_1km_human_population_threshold
+print(raster_1km_human_population_threshold_2)
+# Summary of the raster to check the range of values
+summary(raster_1km_human_population_threshold_2)
+
+#Step 2.2: Check the number of non-zero and NA values
+num_zeros <- sum(values(raster_1km_human_population_threshold_2) == 0, na.rm = TRUE)
+num_nas <- sum(is.na(values(raster_1km_human_population_threshold_2)))
+num_non_zeros <- sum(values(raster_1km_human_population_threshold_2) > 0, na.rm = TRUE)
+cat("Number of zero values:", num_zeros, "\n")
+cat("Number of NA values:", num_nas, "\n")
+cat("Number of non-zero values:", num_non_zeros, "\n")
+
+#Step 2.3: Replace NA values with zeros (if appropriate for your analysis)
+raster_1km_human_population_threshold_2[is.na(raster_1km_human_population_threshold_2)] <- 0
+plot(raster_1km_human_population_threshold_2)
+# Check if NA values are replaced
+na_count_after <- sum(is.na(values(raster_1km_human_population_threshold_2)))
+print(paste("Number of NA values after replacement:", na_count_after))
+
+#Step 2.4: Get the number of rows and columns from the original raster
+nrows <- nrow(raster_1km_human_population_threshold_2)
+ncols <- ncol(raster_1km_human_population_threshold_2)
+
+#Step 2.5: Convert the raster to a matrix and reshape it
+population_matrix_LC <- matrix(values(raster_1km_human_population_threshold_2), 
+                            nrow = nrows, ncol = ncols, byrow = TRUE)
+# Check the dimensions and a small portion of the matrix
+dim(population_matrix_LC)
+print("Top-left corner of the matrix:")
+print(population_matrix_LC[1:10, 1:10])  # Displaying the top-left 10x10 cells
+
+# Step 3: Use the 'Fast-Fourier' transform to compute the convolution
+convolved_matrix_LC <- convolve_image(population_matrix_LC, kernel_matrix_LC)
+
+# Step 4: convert the matrix to raster
+
+# Step 4.1: Convert the convolved matrix back to raster format using terra's rast function
+convolved_raster_LC <- rast(nrows = nrow(raster_1km_human_population_threshold_2),
+                                  ncols = ncol(raster_1km_human_population_threshold_2),
+                                  xmin = xmin(raster_1km_human_population_threshold_2),
+                                  xmax = xmax(raster_1km_human_population_threshold_2),
+                                  ymin = ymin(raster_1km_human_population_threshold_2),
+                                  ymax = ymax(raster_1km_human_population_threshold_2))
+
+# Step 4.2: Assign the values of the convolved matrix back to the raster
+values(convolved_raster_LC) <- convolved_matrix_LC
+
+# Step 4.3: fix crs, extent and resolution
+res(raster_1km_human_population_threshold_2)
+res(convolved_raster_LC)
+crs(raster_1km_human_population_threshold_2)
+crs(convolved_raster_LC)
+ext(raster_1km_human_population_threshold_2)
+ext(convolved_raster_LC)
+
+# Step 4.3: fix crs
+crs(convolved_raster_LC) <- crs(raster_1km_human_population_threshold_2)
+
+# Step 5: Plot results
+plot(raster_1km_human_population_threshold_2, main = "Original Population Raster")
+plot(kernel_matrix_LC, main = "Kernel Raster")
+plot(convolved_raster_LC, main = "Convolved Raster with Identity Kernel")
+
+# Step 6: mask the ocean
+
+# Step 6.1: import the inland shapefile
+inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
+
+# Step 6.2: mask the output raster
+convolved_raster_masked_LC <- mask(convolved_raster_LC, inland_raster)
+plot(convolved_raster_masked_LC)
+
+# Compute quantile breaks (exclude NA values)
+q_breaks <- quantile(values(convolved_raster_masked_LC), 
+                     probs = seq(0, 1, length.out = 11), 
+                     na.rm = TRUE)
+
+# Plot with 10 quantile levels
+plot(convolved_raster_masked_LC, 
+     breaks = q_breaks, 
+     col = hcl.colors(10, "YlOrRd", rev = TRUE), 
+     main = "Convolved Raster (Quantile Breaks) large carnivores")
+
+# Step 7: export
+#output_file_WTT_masked <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_LC_raster_masked_240925.tif")
+#writeRaster(convolved_raster_masked_LC, output_file_WTT_masked, overwrite=TRUE)
+
+
+
+```
+
+For large herbivores
+
+```{r}
+
+# Step 1: create the kernel matrix
+
+# Step 1.1: Define matrix dimensions and create the distance matrix
+nrows <- nrow(raster_1km_human_population_threshold)
+ncols <- ncol(raster_1km_human_population_threshold)
+x_coords <- matrix(rep(seq(1, ncols), each = nrows), nrow = nrows, ncol = ncols)
+y_coords <- matrix(rep(seq(1, nrows), times = ncols), nrow = nrows, ncol = ncols)
+center_x <- ncols / 2
+center_y <- nrows / 2
+distance_matrix_LH <- sqrt((x_coords - center_x)^2 + (y_coords - center_y)^2)
+
+# Step 1.2: Define parameters for the lognormal kernel
+mu <- -1.50609
+sigma <- 0.572612
+
+# Step 1.3: Create the lognormal kernel matrix
+kernel_matrix_LH <- dlnorm(distance_matrix_LH, meanlog = mu, sdlog = sigma)
+
+# Step 1.4: Check the dimensions and a small portion of the matrix
+dim(kernel_matrix_LH)
+print("Top-left corner of the matrix:")
+print(kernel_matrix_LH[1:10, 1:10])  # Displaying the top-left 10x10 cells
+
+#Step 2: create the population matrix
+#Step 2.1: create an identifcal raster and print basic information about the raster
+raster_1km_human_population_threshold_3 <- raster_1km_human_population_threshold
+print(raster_1km_human_population_threshold_3)
+# Summary of the raster to check the range of values
+summary(raster_1km_human_population_threshold_3)
+#Step 2.2: Check the number of non-zero and NA values
+num_zeros <- sum(values(raster_1km_human_population_threshold_3) == 0, na.rm = TRUE)
+num_nas <- sum(is.na(values(raster_1km_human_population_threshold_3)))
+num_non_zeros <- sum(values(raster_1km_human_population_threshold_3) > 0, na.rm = TRUE)
+cat("Number of zero values:", num_zeros, "\n")
+cat("Number of NA values:", num_nas, "\n")
+cat("Number of non-zero values:", num_non_zeros, "\n")
+#Step 2.3: Replace NA values with zeros (if appropriate for your analysis)
+raster_1km_human_population_threshold_3[is.na(raster_1km_human_population_threshold_3)] <- 0
+plot(raster_1km_human_population_threshold_3)
+# Check if NA values are replaced
+na_count_after <- sum(is.na(values(raster_1km_human_population_threshold_3)))
+print(paste("Number of NA values after replacement:", na_count_after))
+#Step 2.4: Get the number of rows and columns from the original raster
+nrows <- nrow(raster_1km_human_population_threshold_3)
+ncols <- ncol(raster_1km_human_population_threshold_3)
+#Step 2.5: Convert the raster to a matrix and reshape it
+population_matrix_LH <- matrix(values(raster_1km_human_population_threshold_3), 
+                            nrow = nrows, ncol = ncols, byrow = TRUE)
+# Check the dimensions and a small portion of the matrix
+dim(population_matrix_LH)
+print("Top-left corner of the matrix:")
+print(population_matrix_LH[1:10, 1:10])  # Displaying the top-left 10x10 cells
+
+# Step 3: Use the 'Fast-Fourier' transform to compute the convolution
+convolved_matrix_LH <- convolve_image(population_matrix_LH, kernel_matrix_LH)
+
+# Step 4: convert the matrix to raster
+# Step 4.1: Convert the convolved matrix back to raster format using terra's rast function
+convolved_raster_LH <- rast(nrows = nrow(raster_1km_human_population_threshold_3),
+                                  ncols = ncol(raster_1km_human_population_threshold_3),
+                                  xmin = xmin(raster_1km_human_population_threshold_3),
+                                  xmax = xmax(raster_1km_human_population_threshold_3),
+                                  ymin = ymin(raster_1km_human_population_threshold_3),
+                                  ymax = ymax(raster_1km_human_population_threshold_3))
+# Step 4.2: Assign the values of the convolved matrix back to the raster
+values(convolved_raster_LH) <- convolved_matrix_LH
+# Step 4.3: fix crs, extent and resolution
+res(raster_1km_human_population_threshold_3)
+res(convolved_raster_LH)
+crs(raster_1km_human_population_threshold_3)
+crs(convolved_raster_LH)
+ext(raster_1km_human_population_threshold_3)
+ext(convolved_raster_LH)
+# Step 4.3: fix crs
+crs(convolved_raster_LH) <- crs(raster_1km_human_population_threshold_3)
+
+# Step 5: Plot results
+plot(raster_1km_human_population_threshold_3, main = "Original Population Raster")
+plot(kernel_matrix_LH, main = "Kernel Raster")
+plot(convolved_raster_LH, main = "Convolved Raster with Identity Kernel")
+
+# Step 6: mask the ocean
+# Step 6.1: import the inland shapefile
+inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
+# Step 6.2: mask the output raster
+convolved_raster_masked_LH <- mask(convolved_raster_LH, inland_raster)
+plot(convolved_raster_masked_LH)
+
+# Compute quantile breaks (exclude NA values)
+q_breaks <- quantile(values(convolved_raster_masked_LH), 
+                     probs = seq(0, 1, length.out = 11), 
+                     na.rm = TRUE)
+
+# Plot with 10 quantile levels
+plot(convolved_raster_masked_LH, 
+     breaks = q_breaks, 
+     col = hcl.colors(10, "YlOrRd", rev = TRUE), 
+     main = "Convolved Raster (Quantile Breaks) large herbivores")
+
+#Step 7: export
+#output_file_WTT_masked_LH <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_LH_raster_masked_241212.tif")
+#writeRaster(convolved_raster_masked_LH, output_file_WTT_masked_LH, overwrite=TRUE)
+
+```
+
+## for each cell multiply the wildlife status (current presence where cell value = 1 and comeback probability where cell value is between 0 and 1) with the sum of people travelling
+
+```{r}
+
+#Get the occupancy raster (with 1, 0 and NA)
+raster_1km_wildlife_occupancy_stack_path <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_occupancy_250106.tif" # Read the 1km resolution raster
+raster_1km_wildlife_occupancy_stack <- rast(raster_1km_wildlife_occupancy_stack_path)
+plot(raster_1km_wildlife_occupancy_stack)
+
+#Get the probability based on the distance to 1 (cells with 1 have a 0 probability)
+raster_1km_wildlife_probability_stack_path <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_expansion_probability_250106.tif" # Read the 1km resolution raster
+raster_1km_wildlife_probability_stack <- rast(raster_1km_wildlife_probability_stack_path)
+plot(raster_1km_wildlife_probability_stack)
+
+#WTT changed with the review, hence the files WTT_LC_raster_masked_240925.tif and WTT_LH_raster_masked_241212.tif are not valid anymore but convolved_raster_masked_LC and convolved_raster_masked_LH are produced above the right new way
+#Get WTT
+#Carnivores
+#convolved_raster_masked_LC <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_LC_raster_masked_240925.tif" # Read raster
+#convolved_raster_masked_LC <- rast(convolved_raster_masked_LC)
+plot(convolved_raster_masked_LC)
+#Herbivores
+#convolved_raster_masked_LH <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_LH_raster_masked_241212.tif" # Read raster
+#convolved_raster_masked_LH <- rast(convolved_raster_masked_LH)
+plot(convolved_raster_masked_LH)
+
+#Multiply occupancy x WTT and multiply probability x WTT
+
+# Define species for carnivores and herbivores (without prefixes)
+carnivores <- c("CANLUP", "LYNLYN", "LYNPAR", "URSARC")  # Example carnivores
+herbivores <- c("ALCALC", "BISBON", "CAPIBE", "CAPPYR")  # Example herbivores
+
+# Construct species names for occupancy (M_ prefix)
+carnivores_occupancy <- paste0("M_", carnivores)
+herbivores_occupancy <- paste0("M_", herbivores)
+# Construct species names for probability (P_ prefix)
+carnivores_probability <- paste0("P_", carnivores)
+herbivores_probability <- paste0("P_", herbivores)
+
+# Identify indices in the stacks
+# Occupancy stack
+carnivore_indices_occupancy <- which(names(raster_1km_wildlife_occupancy_stack) %in% carnivores_occupancy)
+herbivore_indices_occupancy <- which(names(raster_1km_wildlife_occupancy_stack) %in% herbivores_occupancy)
+# Probability stack
+carnivore_indices_probability <- which(names(raster_1km_wildlife_probability_stack) %in% carnivores_probability)
+herbivore_indices_probability <- which(names(raster_1km_wildlife_probability_stack) %in% herbivores_probability)
+
+# Split the stacks by species type
+# For occupancy
+occupancy_carnivores <- raster_1km_wildlife_occupancy_stack[[carnivore_indices_occupancy]]
+occupancy_herbivores <- raster_1km_wildlife_occupancy_stack[[herbivore_indices_occupancy]]
+# For probability
+probability_carnivores <- raster_1km_wildlife_probability_stack[[carnivore_indices_probability]]
+probability_herbivores <- raster_1km_wildlife_probability_stack[[herbivore_indices_probability]]
+
+# Multiply rasters
+SB_occupancy_carnivores <- occupancy_carnivores * convolved_raster_masked_LC
+SB_occupancy_herbivores <- occupancy_herbivores * convolved_raster_masked_LH
+SB_probability_carnivores <- probability_carnivores * convolved_raster_masked_LC
+SB_probability_herbivores <- probability_herbivores * convolved_raster_masked_LH
+
+# Combine the results back into stacks
+SB_occupancy <- c(SB_occupancy_carnivores, SB_occupancy_herbivores)
+SB_probability <- c(SB_probability_carnivores, SB_probability_herbivores)
+
+# Rename layers to indicate SB_occupancy and SB_probability
+names(SB_occupancy) <- gsub("^M_", "SB_occ_", names(SB_occupancy))
+names(SB_probability) <- gsub("^P_", "SB_proba_", names(SB_probability))
+
+# Calculate the sum of all layers in each stack
+SB_occ_sum <- sum(SB_occupancy)  # Sum of all SB_occ rasters
+SB_proba_sum <- sum(SB_probability)  # Sum of all SB_proba rasters
+
+# Rename the sum rasters for clarity
+names(SB_occ_sum) <- "SB_occ_sum"
+names(SB_proba_sum) <- "SB_proba_sum"
+
+# Add the sum raster to each stack
+SB_occupancy <- c(SB_occupancy, SB_occ_sum)
+SB_probability <- c(SB_probability, SB_proba_sum)
+
+# Plot
+plot(SB_occupancy)
+plot(SB_probability)
+
+# Verify the new order
+print(names(SB_occupancy))  # Should match desired_order_occupancy
+# Re-order SB_occupancy and SB_probability
+desired_order_occupancy <- c(
+  "SB_occ_CANLUP", "SB_occ_ALCALC", "SB_occ_BISBON", "SB_occ_LYNLYN", 
+  "SB_occ_URSARC", "SB_occ_LYNPAR", "SB_occ_CAPIBE", "SB_occ_CAPPYR", 
+  "SB_occ_sum"
+)
+
+desired_order_probability <- c(
+  "SB_proba_CANLUP", "SB_proba_ALCALC", "SB_proba_BISBON", "SB_proba_LYNLYN", 
+  "SB_proba_URSARC", "SB_proba_LYNPAR", "SB_proba_CAPIBE", "SB_proba_CAPPYR", 
+  "SB_proba_sum"
+)
+
+# Reorder SB_occupancy
+SB_occupancy <- SB_occupancy[[match(desired_order_occupancy, names(SB_occupancy))]]
+
+# Reorder SB_probability
+print(names(SB_occupancy))  # Should match desired_order_occupancy
+print(names(SB_probability))  # Should match desired_order_probability
+
+#Stack WTT, occupancy, proba and the two SB
+WTT_occ_proba_SB_stack <- c(convolved_raster_masked_LC, convolved_raster_masked_LH, raster_1km_wildlife_occupancy_stack, raster_1km_wildlife_probability_stack, SB_occupancy, SB_probability)
+names(WTT_occ_proba_SB_stack)[1:2] <- c("WTT_LC", "WTT_LH")
+
+print(names(WTT_occ_proba_SB_stack)) 
+
+#Export
+#output_WTT_occ_proba_SB_stack <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250106.tif")
+#writeRaster(WTT_occ_proba_SB_stack, output_WTT_occ_proba_SB_stack, overwrite=TRUE)
+
+WTT_occ_proba_SB_stack <- c(convolved_raster_masked_LC, convolved_raster_masked_LH, raster_1km_wildlife_occupancy_stack, raster_1km_wildlife_probability_stack)
+names(WTT_occ_proba_SB_stack)[1:2] <- c("WTT_LC", "WTT_LH")
+plot(WTT_occ_proba_SB_stack)
+
+#output_WTT_occ_proba_SB_stack <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif")
+#writeRaster(WTT_occ_proba_SB_stack, output_WTT_occ_proba_SB_stack, overwrite=TRUE)
+
+```
+
+## Step 3 - Determining social conflict
+
+1) Import livestock distribution data
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
+
+## Step n
+
+```{r}
+
+
+
+
+```
