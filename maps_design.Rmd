@@ -619,7 +619,7 @@ plot(convolved_raster_masked_LH,
 
 ```
 
-## for each cell multiply the wildlife status (current presence where cell value = 1 and comeback probability where cell value is between 0 and 1) with the sum of people travelling
+for each cell multiply the wildlife status (current presence where cell value = 1 and comeback probability where cell value is between 0 and 1) with the sum of people travelling
 
 ```{r}
 
@@ -750,8 +750,351 @@ plot(WTT_occ_proba_SB_stack)
 
 ```{r}
 
+# Get the total of cow, sheep, goat and pig per cell
+
+# Import data
+
+cow_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/COWS/5_Ct_2015_Da.tif"
+cow_population <- rast(cow_population_path)
+plot(cow_population)
+
+goat_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/GOATS/5_Gt_2015_Da.tif"
+goat_population <- rast(goat_population_path)
+plot(goat_population)
+
+pig_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/PIGS/5_Pg_2015_Da.tif"
+pig_population <- rast(pig_population_path)
+plot(pig_population)
+
+sheep_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/SHEEPS/5_Sh_2015_Da.tif"
+sheep_population <- rast(sheep_population_path)
+plot(sheep_population)
+
+livestock_rasters <- c(cow_population, goat_population, pig_population, sheep_population)
+
+# Crop the rasters to Europe
+
+# Rasterize the shapefile to align with the raster resolution and extent
+inland_vect <- terra::vect(inland_shapefile)  # convert sf or shapefile to SpatVector
+plot(inland_vect)
+inland_raster <- terra::rasterize(inland_vect, ref_raster, field = 1, background = NA)
+plot(inland_raster)
+
+# Ensure CRS matches
+livestock_rasters_aligned <- project(livestock_rasters, crs(inland_raster))
+
+# Align extent and resolution of livestock rasters to inland_raster
+livestock_rasters_aligned <- terra::resample(livestock_rasters_aligned, inland_raster, method = "bilinear")
+plot(livestock_rasters_aligned)
+
+# Mask the livestock rasters with the inland raster
+livestock_rasters_masked <- mask(livestock_rasters_aligned, inland_raster)
+plot(livestock_rasters_masked)
+names(livestock_rasters_masked) <- c("livestock_Cattle", "livestock_Goat", "livestock_Pig", "livestock_Sheep")
+
+# Solve the issue of Denmark missing for goats
+# Before summing the 4 layers the absence of Danmark for goats needs to be handled
+# Create a mask for valid land areas (non-NA areas in any raster)
+land_mask <- !is.na(livestock_rasters_masked$livestock_Cattle) | !is.na(livestock_rasters_masked$livestock_Goat) | !is.na(livestock_rasters_masked$livestock_Pig) | !is.na(livestock_rasters_masked$livestock_Sheep)
+
+# Replace NA values with 0 only for summing (for the sum layer)
+conflict_raster_cow_sum <- livestock_rasters_masked$livestock_Cattle
+conflict_raster_cow_sum[is.na(conflict_raster_cow_sum)] <- 0
+
+conflict_raster_goat_sum <- livestock_rasters_masked$livestock_Goat
+conflict_raster_goat_sum[is.na(conflict_raster_goat_sum)] <- 0
+
+conflict_raster_pig_sum <- livestock_rasters_masked$livestock_Pig
+conflict_raster_pig_sum[is.na(conflict_raster_pig_sum)] <- 0
+
+conflict_raster_sheep_sum <- livestock_rasters_masked$livestock_Sheep
+conflict_raster_sheep_sum[is.na(conflict_raster_sheep_sum)] <- 0
+
+```
+
+## Add reindeer
+
+```{r}
+
+# 1. Load herding polygon and inland raster
+herding_poly <- vect("S:/Magali_Weissgerber/Livestock for social conflict of rewilding/Reindeer/reindeer_polygon_250618.shp")
+plot(herding_poly)
+plot(inland_raster)
+countries <- vect("I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/CountriesPanEURno500isl.shp")
+plot(countries)
+
+# 2. Reproject vector data to match inland_raster
+herding_poly <- project(herding_poly, crs(inland_raster))
+plot(herding_poly)
+countries <- project(countries, crs(inland_raster))
+names(countries)
+
+# 3. Convert inland raster to polygon (to define valid inland zones)
+inland_poly <- as.polygons(inland_raster, dissolve=TRUE, na.rm=TRUE)
+plot(inland_poly)
+
+# 4. Clip the herding polygon by inland extent
+herding_poly <- st_as_sf(herding_poly)
+inland_poly <- st_as_sf(inland_poly)
+# Intersect
+herding_clipped <- st_intersection(herding_poly, inland_poly)
+
+plot(herding_clipped)
+
+# 5. Filter countries to Norway, Sweden, Finland
+nordics <- countries[countries$Country %in% c("Norway", "Sweden", "Finland"), ]
+plot(nordics)
+nordics <- st_as_sf(nordics)
+
+# 6. Intersect clipped herding area with these three countries
+herding_by_country <- st_intersection(herding_clipped, nordics)
+plot(herding_by_country)
+names(herding_by_country)
+
+# 7. Recalculate area per polygon (in km²)
+# Ensure projected CRS in meters (e.g., EPSG:3035)
+herding_by_country <- st_transform(herding_by_country, crs = 3035)
+herding_by_country$area_km2 <- as.numeric(st_area(herding_by_country)) / 1e6
+
+# 8. Add reindeer population per country
+herding_by_country$reindeer <- NA
+herding_by_country$reindeer[herding_by_country$Country == "Sweden"] <- 241054
+herding_by_country$reindeer[herding_by_country$Country == "Norway"] <- 210000
+herding_by_country$reindeer[herding_by_country$Country == "Finland"] <- 190000
+
+# 9. Calculate reindeer density per km²
+herding_by_country$density <- herding_by_country$reindeer / herding_by_country$area_km2
+
+# 10. Create raster template (same resolution/extent as inland_raster)
+template <- inland_raster
+
+# Convert to SpatVector for terra::rasterize
+herding_vect <- vect(herding_by_country)
+
+# 11. Rasterize using the density field
+density_raster <- rasterize(herding_vect, template, field = "density", background = 0)
+names(density_raster) <- "livestock_reindeer"
+plot(density_raster)
+reindeer_population <- density_raster
+
+# Mask it to land
+reindeer_population_masked <- mask(density_raster, land_mask, maskvalues = FALSE)
+plot(reindeer_population_masked)
+
+```
+
+Prepare one layer with all livestock species
+
+```{r}
+
+# Stack the rasters
+conflict_raster_stack <- c(conflict_raster_cow_sum, conflict_raster_goat_sum, conflict_raster_pig_sum, conflict_raster_sheep_sum, reindeer_population)
+names(conflict_raster_stack)
+plot(conflict_raster_cow_sum)
+
+# Sum the rasters while treating NA as 0
+conflict_raster_stack_summed <- sum(conflict_raster_stack)
+plot(conflict_raster_stack_summed)
+
+# Create a layer without pigs
+conflict_raster_stack_summed_no_pigs <- sum(conflict_raster_cow_sum, conflict_raster_goat_sum, conflict_raster_sheep_sum, reindeer_population)
+
+# Apply the land mask to retain original NA areas
+conflict_raster_stack_summed <- mask(conflict_raster_stack_summed, land_mask, maskvalues=FALSE)
+conflict_raster_stack_summed_no_pigs <- mask(conflict_raster_stack_summed_no_pigs, land_mask, maskvalues=FALSE)
+
+# Have a look
+print(conflict_raster_stack_summed)
+par(mfrow = c(1,2))
+plot(conflict_raster_stack_summed)
+plot(conflict_raster_stack_summed_no_pigs)
+
+# Stack all the rasters
+conflict_raster_stack_complete <- c(livestock_rasters_masked, reindeer_population_masked, conflict_raster_stack_summed, conflict_raster_stack_summed_no_pigs)
+names(conflict_raster_stack_complete)
+names(conflict_raster_stack_complete) <- c("livestock_cow", "livestock_goat", "livestock_pig", "livestock_sheep","livestock_reindeer", "livestock_sum", "livestock_sum_no_pigs")
+plot(conflict_raster_stack_complete)
+
+```
+
+## Step 4: Load all the data necessary to design the figures
+
+Climate change mitigation: potential carbon, abandonment, low intensity of use
+
+```{r}
+
+# Potential carbon (Walker 2022)
+
+pot_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Pot_AGB_BGB_SOC_MgCha_500m.tif')
+crs(pot_carbon) == crs(ref_raster)             # Coordinate system
+res(pot_carbon) == res(ref_raster)             # Resolution
+ext(pot_carbon) == ext(ref_raster)             # Extent
+pot_carbon_proj <- project(pot_carbon, ref_raster)
+crs(pot_carbon_proj) == crs(ref_raster)             # Coordinate system
+res(pot_carbon_proj) == res(ref_raster)             # Resolution
+ext(pot_carbon_proj) == ext(ref_raster)             # Extent
+
+# Abandonment
+
+abandon <- terra::rast('I:\\biocon\\Magali_Weissgerber\\wildE_framework_240912\\Maps\\20250106_lq\\data\\rewilding.tif')
+# (1 = 1 scenario of abandonment is happening, 4 = four scenarios of abandonment are happening)
+plot(abandon)
+# Classify abandonment to present/absent
+rcl <- matrix(c(1,1,
+                2,1,
+                3,1,
+                4,1,
+                0,NA,
+                9,NA,
+                255, NA), ncol=2, byrow = T)
+aban_simple <- terra::classify(abandon, rcl)
+plot(aban_simple)
+# Check crs, red and ext
+crs(aban_simple) == crs(ref_raster)             # Coordinate system
+res(aban_simple) == res(ref_raster)             # Resolution
+ext(aban_simple) == ext(ref_raster)             # Extent
+aban_simple_proj <- project(aban_simple, ref_raster)
+plot(aban_simple_proj)
+aban_simple_aligned <- terra::resample(aban_simple_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
+plot(aban_simple_aligned)
+
+# Intensity of use with threshold
+
+# Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
+hanpp_path <- "I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
+hanpp_path <- "I:/biocon/Projects_RESTORED_20250711_091725/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
+# Load the raster
+hanpp_raster <- rast(hanpp_path)
+# Plot to check
+plot(hanpp_raster, main = "HANPP 2006 Gapfilled (1km)")
+# Invert and re-scale (100 - value) / 100 (we want high values to indicate natural areas and the % to be between 0 and 1)
+hanpp_inverted <- (100 - hanpp_raster) / 100
+# Checks
+crs(hanpp_inverted) == crs(ref_raster)             # Coordinate system
+res(hanpp_inverted) == res(ref_raster)             # Resolution
+ext(hanpp_inverted) == ext(ref_raster)             # Extent
+hanpp_proj <- project(hanpp_inverted, ref_raster)
+plot(hanpp_proj)
+hanpp_aligned <- terra::resample(hanpp_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
+plot(hanpp_aligned)
+# Plot to check result
+plot(hanpp_aligned, main = "Inverted HANPP (scaled 0–1)")
+# Potential expansion with a combined probability of at least 0.8 (threshold)
+hanpp_aligned_threshold_8 <- classify(hanpp_aligned, matrix(c(-Inf, 0.8, 0, 0.8, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(hanpp_aligned_threshold_8, main = "Binary naturalness (≥0.8 = 1)")
+
+```
+
+Climate change mitigation: climate velocity, abandonment, connectivity
+
+```{r}
+
+# Climate velocity
+
+cv <- terra::rast('S:\\Magali_Weissgerber\\Climate velocity\\CV_data_cropped_to_europe.tif')
+plot(cv)
+crs(cv) == crs(ref_raster)             # Coordinate system
+res(cv) == res(ref_raster)             # Resolution
+ext(cv) == ext(ref_raster)             # Extent
+cv_proj <- project(cv, ref_raster)
+plot(cv_proj)
+cv_aligned <- terra::resample(cv_proj, ref_raster, method = "near")  # use "bilinear" for continuous 
+plot(cv_aligned)
+
+# Abandonment
+# Cf "climate change mitigation"
+
+# Conectivity
+
+# Load the file
+# Define import directory
+# Define the directory path
+directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\WildE_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
+# List files for 2022 with .tif or .tiff extension
+meff_2022_file <- list.files(
+  path = directory_anth_meff,
+  pattern = "2022.*\\.tif[f]?$",  # matches .tif or .tiff
+  full.names = TRUE
+)
+# Import the raster
+meff_2022 <- rast(meff_2022_file)
+# Checks
+crs(meff_2022) == crs(ref_raster)             # Coordinate system
+res(meff_2022) == res(ref_raster)             # Resolution
+ext(meff_2022) == ext(ref_raster)             # Extent
+meff_2022_proj <- project(meff_2022, ref_raster)
+plot(meff_2022_proj)
+# Keep higher 80%
+# Reclassify: values >= 80 → 1, else → 0
+meff_2022_binary_T8 <- ifel(meff_2022_proj >= 80, 1, 0)
+plot(meff_2022_binary_T8)
+
+```
+
+Social benefits: number of people travelling, current mammals' distribution, potential future mammals' distribution
+
+```{r}
+
+# Import occurrence, probability and people travelling data
+WTT_occ_proba_SB_stack <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif"
+WTT_occ_proba_SB_stack <- rast(WTT_occ_proba_SB_stack)
+names(WTT_occ_proba_SB_stack)
+compareGeom(WTT_occ_proba_SB_stack, ref_raster)
+
+# People travelling based on the Willingness-to-travel. LC = large carnivores, LH = large herbivores
+WTT_average = (WTT_occ_proba_SB_stack$WTT_LC + WTT_occ_proba_SB_stack$WTT_LH) / 2
+plot(WTT_average) 
+
+# Where species already as binary
+# Current distribution binary (= with only 1s)
+M_sum_binary <- ifel(WTT_occ_proba_SB_stack$M_sum > 0, 1, NA)
+plot(M_sum_binary)
+
+# Potential expansion with a combined probability of at least 0.5 (threshold)
+P_SUM_threshold <- classify(WTT_occ_proba_SB_stack$P_SUM, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(P_SUM_threshold, main = "Binary probability (≥0.5 = 1)")
+
+```
+
+Social conflicts: livestock density, current Canis lipus and Ursus arctos distribution, potential Canis lipus and Ursus arctos distribution
+
+```{r}
+
+# livestock population as continuous
+plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
+
+# requires species (bear and wolf) expansion as binary (threshold at 0.5) and livestock population as continuous
+
+# Sum CANLUP and URSARC proba
+P_CN_UA <- WTT_occ_proba_SB_stack$P_CANLUP + WTT_occ_proba_SB_stack$P_URSARC
+plot(P_CN_UA)
+# Potential expansion with a combined probability of at least 0.5 (threshold)
+P_CN_UA_threshold <- classify(P_CN_UA, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(P_CN_UA_threshold, main = "Binary probability (≥0.5 = 1)")
 
 
+# Where species (bear and wolf) already there as binary
+# Sum CANLUP and URSARC current
+M_CN_UA <- WTT_occ_proba_SB_stack$M_CANLUP + WTT_occ_proba_SB_stack$M_URSARC
+plot(M_CN_UA)
+# Current distribution binary (= with only 1s)
+M_CN_UA_binary <- ifel(M_CN_UA > 0, 1, NA)
+plot(M_CN_UA_binary)
+
+# requires species (bear and wolf) expansion as binary (threshold at 0.5) and livestock population as continuous
+# Sum CANLUP and URSARC proba
+P_CN_UA <- WTT_occ_proba_SB_stack$P_CANLUP + WTT_occ_proba_SB_stack$P_URSARC
+plot(P_CN_UA)
+# Potential expansion with a combined probability of at least 0.5 (threshold)
+P_CN_UA_threshold <- classify(P_CN_UA, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(P_CN_UA_threshold, main = "Binary probability (≥0.5 = 1)")
+
+# livestock population as continuous
+plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
 
 ```
 
@@ -772,7 +1115,6 @@ plot(WTT_occ_proba_SB_stack)
 
 
 ```
-
 ## Step n
 
 ```{r}
@@ -781,34 +1123,6 @@ plot(WTT_occ_proba_SB_stack)
 
 
 ```
-
-## Step n
-
-```{r}
-
-
-
-
-```
-
-## Step n
-
-```{r}
-
-
-
-
-```
-
-## Step n
-
-```{r}
-
-
-
-
-```
-
 ## Step n
 
 ```{r}
