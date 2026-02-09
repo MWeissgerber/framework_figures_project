@@ -85,7 +85,150 @@ raster_1km_human_population <- population_preprocessed
 
 ```
 
-## Step 1 - determining the expansion probability of large mammals
+## I. Upload and prepare the data
+
+# 1 Climate change mitigation
+
+Current = low use intensity
+
+```{r}
+
+# Intensity of use with threshold
+
+# Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
+hanpp_path <- "I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
+hanpp_path <- "I:/biocon/Projects_RESTORED_20250711_091725/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
+# Load the raster
+hanpp_raster <- rast(hanpp_path)
+# Plot to check
+plot(hanpp_raster, main = "HANPP 2006 Gapfilled (1km)")
+# Invert and re-scale (100 - value) / 100 (we want high values to indicate natural areas and the % to be between 0 and 1)
+hanpp_inverted <- (100 - hanpp_raster) / 100
+# Checks
+crs(hanpp_inverted) == crs(ref_raster)             # Coordinate system
+res(hanpp_inverted) == res(ref_raster)             # Resolution
+ext(hanpp_inverted) == ext(ref_raster)             # Extent
+hanpp_proj <- project(hanpp_inverted, ref_raster)
+plot(hanpp_proj)
+hanpp_aligned <- terra::resample(hanpp_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
+plot(hanpp_aligned)
+# Plot to check result
+plot(hanpp_aligned, main = "Inverted HANPP (scaled 0–1)")
+# Potential expansion with a combined probability of at least 0.8 (threshold)
+hanpp_aligned_threshold_8 <- classify(hanpp_aligned, matrix(c(-Inf, 0.8, 0, 0.8, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(hanpp_aligned_threshold_8, main = "Binary naturalness (≥0.8 = 1)")
+
+```
+
+Potential = abandonment
+
+```{r}
+
+# Abandonment
+
+abandon <- terra::rast('I:\\biocon\\Magali_Weissgerber\\wildE_framework_240912\\Maps\\20250106_lq\\data\\rewilding.tif')
+# (1 = 1 scenario of abandonment is happening, 4 = four scenarios of abandonment are happening)
+plot(abandon)
+# Classify abandonment to present/absent
+rcl <- matrix(c(1,1,
+                2,1,
+                3,1,
+                4,1,
+                0,NA,
+                9,NA,
+                255, NA), ncol=2, byrow = T)
+aban_simple <- terra::classify(abandon, rcl)
+plot(aban_simple)
+# Check crs, red and ext
+crs(aban_simple) == crs(ref_raster)             # Coordinate system
+res(aban_simple) == res(ref_raster)             # Resolution
+ext(aban_simple) == ext(ref_raster)             # Extent
+aban_simple_proj <- project(aban_simple, ref_raster)
+plot(aban_simple_proj)
+aban_simple_aligned <- terra::resample(aban_simple_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
+plot(aban_simple_aligned)
+
+```
+
+Benefits = potential carbons stock
+
+```{r}
+
+# Potential carbon (Walker 2022)
+
+pot_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Pot_AGB_BGB_SOC_MgCha_500m.tif')
+crs(pot_carbon) == crs(ref_raster)             # Coordinate system
+res(pot_carbon) == res(ref_raster)             # Resolution
+ext(pot_carbon) == ext(ref_raster)             # Extent
+pot_carbon_proj <- project(pot_carbon, ref_raster)
+crs(pot_carbon_proj) == crs(ref_raster)             # Coordinate system
+res(pot_carbon_proj) == res(ref_raster)             # Resolution
+ext(pot_carbon_proj) == ext(ref_raster)             # Extent
+
+```
+
+# 2 Climate change adaptation
+
+Current = high effectivement mesh size
+
+```{r}
+
+# Connectivity
+
+# Load the file
+# Define import directory
+# Define the directory path
+directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\WildE_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
+# List files for 2022 with .tif or .tiff extension
+meff_2022_file <- list.files(
+  path = directory_anth_meff,
+  pattern = "2022.*\\.tif[f]?$",  # matches .tif or .tiff
+  full.names = TRUE
+)
+# Import the raster
+meff_2022 <- rast(meff_2022_file)
+# Checks
+crs(meff_2022) == crs(ref_raster)             # Coordinate system
+res(meff_2022) == res(ref_raster)             # Resolution
+ext(meff_2022) == ext(ref_raster)             # Extent
+meff_2022_proj <- project(meff_2022, ref_raster)
+plot(meff_2022_proj)
+# Keep higher 80%
+# Reclassify: values >= 80 → 1, else → 0
+meff_2022_binary_T8 <- ifel(meff_2022_proj >= 80, 1, 0)
+plot(meff_2022_binary_T8)
+
+```
+
+Potential = abandonment (cf Climate change mitigation)
+
+Benefits = climate velocity
+
+```{r}
+
+# Climate velocity
+
+cv <- terra::rast('S:\\Magali_Weissgerber\\Climate velocity\\CV_data_cropped_to_europe.tif')
+plot(cv)
+crs(cv) == crs(ref_raster)             # Coordinate system
+res(cv) == res(ref_raster)             # Resolution
+ext(cv) == ext(ref_raster)             # Extent
+cv_proj <- project(cv, ref_raster)
+plot(cv_proj)
+cv_aligned <- terra::resample(cv_proj, ref_raster, method = "near")  # use "bilinear" for continuous 
+plot(cv_aligned)
+
+# Abandonment
+# Cf "climate change mitigation"
+
+
+
+```
+
+# 3 Social benefits and risk
+
+# 3.1 Determining the expansion probability of large mammals
 
 We are using the wildlife maps from the Rewild Europe Report (Fernández, N., Torres, A., Wolf, F., Quintero, L., & Pereira, H. M. (2020). Boosting Ecological Restoration for a Wilder Europe. Halle-Wittenberg: German Centre for Integrative Biodiversity Research (iDiv) and Martin-Luther-Universität.)
 
@@ -102,7 +245,7 @@ Then
 
 A parallel processing was added to rasterize the data directly and change the resolution from 10km to 1km, and calculate distance then.
 
-### Import and check data; change to binary
+Import and check data; change to binary
 
 ```{r}
 
@@ -128,7 +271,7 @@ ggplot(SPECIES_OCC_binary_fishnet) +
 
 ```
 
-### Rasterize, create distance raster and calculate probability of expansion
+Rasterize, create distance raster and calculate probability of expansion
 
 Calculate probability of colonization (form K/e^-xdistance) (when distance = 0 it means the species is already there so probability is also 0). 
 Initially we used 1/exp((log(2)/50) distance) so to have 50% of probability of comeback at 50km. But based on Canis lupus dispersal values we apply rather 1/exp((log(2)/60) distance) (as the cells of the mammals ditribution are 10x10km the probability max is 0.89)
@@ -343,12 +486,12 @@ writeRaster(species_probability_stack_2, output_file_Proba, overwrite=TRUE)
 
 ```
 
-## Step 2 - determining social benefit
+## 3.2 - determining social benefit
 
 We look at people's willingness-To-Travel (WTT) to see wildlife.
 WTT is distributed among people, we use this distribution to determine the relation between distance to a cell and the share of people in the surrounding cells that will travel. Use the complementary lognormal CDF function (1 - CDF) and the density of people in a convolution to determine the amount of people going to one cell.
 
-# Prepare rasters
+Prepare rasters
 
 ```{r}
 
@@ -386,7 +529,7 @@ raster_1km_human_population_threshold <- raster_1km_human_population
 
 ```
 
-# Calculate the number of people travelling based on the WTT
+Calculate the number of people travelling based on the WTT
 
 For large carnivores
 
@@ -744,9 +887,35 @@ plot(WTT_occ_proba_SB_stack)
 
 ```
 
-## Step 3 - Determining social conflict
+Clean data for Social benefits: number of people travelling, current mammals' distribution, potential future mammals' distribution
 
-1) Import livestock distribution data
+```{r}
+
+# Import occurrence, probability and people travelling data
+WTT_occ_proba_SB_stack <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif"
+WTT_occ_proba_SB_stack <- rast(WTT_occ_proba_SB_stack)
+names(WTT_occ_proba_SB_stack)
+compareGeom(WTT_occ_proba_SB_stack, ref_raster)
+
+# People travelling based on the Willingness-to-travel. LC = large carnivores, LH = large herbivores
+WTT_average = (WTT_occ_proba_SB_stack$WTT_LC + WTT_occ_proba_SB_stack$WTT_LH) / 2
+plot(WTT_average) 
+
+# Where species already as binary
+# Current distribution binary (= with only 1s)
+M_sum_binary <- ifel(WTT_occ_proba_SB_stack$M_sum > 0, 1, NA)
+plot(M_sum_binary)
+
+# Potential expansion with a combined probability of at least 0.5 (threshold)
+P_SUM_threshold <- classify(WTT_occ_proba_SB_stack$P_SUM, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
+# Plot to check
+plot(P_SUM_threshold, main = "Binary probability (≥0.5 = 1)")
+
+```
+
+## 3.3 - Determining social conflict
+
+Import livestock distribution data
 
 ```{r}
 
@@ -812,7 +981,7 @@ conflict_raster_sheep_sum[is.na(conflict_raster_sheep_sum)] <- 0
 
 ```
 
-## Add reindeer
+Add reindeer
 
 ```{r}
 
@@ -917,148 +1086,7 @@ plot(conflict_raster_stack_complete)
 
 ```
 
-## Step 4: Load all the data necessary to design the figures
-
-Climate change mitigation: potential carbon, abandonment, low intensity of use
-
-```{r}
-
-# Potential carbon (Walker 2022)
-
-pot_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Pot_AGB_BGB_SOC_MgCha_500m.tif')
-crs(pot_carbon) == crs(ref_raster)             # Coordinate system
-res(pot_carbon) == res(ref_raster)             # Resolution
-ext(pot_carbon) == ext(ref_raster)             # Extent
-pot_carbon_proj <- project(pot_carbon, ref_raster)
-crs(pot_carbon_proj) == crs(ref_raster)             # Coordinate system
-res(pot_carbon_proj) == res(ref_raster)             # Resolution
-ext(pot_carbon_proj) == ext(ref_raster)             # Extent
-
-# Abandonment
-
-abandon <- terra::rast('I:\\biocon\\Magali_Weissgerber\\wildE_framework_240912\\Maps\\20250106_lq\\data\\rewilding.tif')
-# (1 = 1 scenario of abandonment is happening, 4 = four scenarios of abandonment are happening)
-plot(abandon)
-# Classify abandonment to present/absent
-rcl <- matrix(c(1,1,
-                2,1,
-                3,1,
-                4,1,
-                0,NA,
-                9,NA,
-                255, NA), ncol=2, byrow = T)
-aban_simple <- terra::classify(abandon, rcl)
-plot(aban_simple)
-# Check crs, red and ext
-crs(aban_simple) == crs(ref_raster)             # Coordinate system
-res(aban_simple) == res(ref_raster)             # Resolution
-ext(aban_simple) == ext(ref_raster)             # Extent
-aban_simple_proj <- project(aban_simple, ref_raster)
-plot(aban_simple_proj)
-aban_simple_aligned <- terra::resample(aban_simple_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
-plot(aban_simple_aligned)
-
-# Intensity of use with threshold
-
-# Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
-hanpp_path <- "I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
-hanpp_path <- "I:/biocon/Projects_RESTORED_20250711_091725/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
-# Load the raster
-hanpp_raster <- rast(hanpp_path)
-# Plot to check
-plot(hanpp_raster, main = "HANPP 2006 Gapfilled (1km)")
-# Invert and re-scale (100 - value) / 100 (we want high values to indicate natural areas and the % to be between 0 and 1)
-hanpp_inverted <- (100 - hanpp_raster) / 100
-# Checks
-crs(hanpp_inverted) == crs(ref_raster)             # Coordinate system
-res(hanpp_inverted) == res(ref_raster)             # Resolution
-ext(hanpp_inverted) == ext(ref_raster)             # Extent
-hanpp_proj <- project(hanpp_inverted, ref_raster)
-plot(hanpp_proj)
-hanpp_aligned <- terra::resample(hanpp_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
-plot(hanpp_aligned)
-# Plot to check result
-plot(hanpp_aligned, main = "Inverted HANPP (scaled 0–1)")
-# Potential expansion with a combined probability of at least 0.8 (threshold)
-hanpp_aligned_threshold_8 <- classify(hanpp_aligned, matrix(c(-Inf, 0.8, 0, 0.8, Inf, 1), ncol = 3, byrow = TRUE))
-# Plot to check
-plot(hanpp_aligned_threshold_8, main = "Binary naturalness (≥0.8 = 1)")
-
-```
-
-Climate change mitigation: climate velocity, abandonment, connectivity
-
-```{r}
-
-# Climate velocity
-
-cv <- terra::rast('S:\\Magali_Weissgerber\\Climate velocity\\CV_data_cropped_to_europe.tif')
-plot(cv)
-crs(cv) == crs(ref_raster)             # Coordinate system
-res(cv) == res(ref_raster)             # Resolution
-ext(cv) == ext(ref_raster)             # Extent
-cv_proj <- project(cv, ref_raster)
-plot(cv_proj)
-cv_aligned <- terra::resample(cv_proj, ref_raster, method = "near")  # use "bilinear" for continuous 
-plot(cv_aligned)
-
-# Abandonment
-# Cf "climate change mitigation"
-
-# Conectivity
-
-# Load the file
-# Define import directory
-# Define the directory path
-directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\WildE_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
-# List files for 2022 with .tif or .tiff extension
-meff_2022_file <- list.files(
-  path = directory_anth_meff,
-  pattern = "2022.*\\.tif[f]?$",  # matches .tif or .tiff
-  full.names = TRUE
-)
-# Import the raster
-meff_2022 <- rast(meff_2022_file)
-# Checks
-crs(meff_2022) == crs(ref_raster)             # Coordinate system
-res(meff_2022) == res(ref_raster)             # Resolution
-ext(meff_2022) == ext(ref_raster)             # Extent
-meff_2022_proj <- project(meff_2022, ref_raster)
-plot(meff_2022_proj)
-# Keep higher 80%
-# Reclassify: values >= 80 → 1, else → 0
-meff_2022_binary_T8 <- ifel(meff_2022_proj >= 80, 1, 0)
-plot(meff_2022_binary_T8)
-
-```
-
-Social benefits: number of people travelling, current mammals' distribution, potential future mammals' distribution
-
-```{r}
-
-# Import occurrence, probability and people travelling data
-WTT_occ_proba_SB_stack <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif"
-WTT_occ_proba_SB_stack <- rast(WTT_occ_proba_SB_stack)
-names(WTT_occ_proba_SB_stack)
-compareGeom(WTT_occ_proba_SB_stack, ref_raster)
-
-# People travelling based on the Willingness-to-travel. LC = large carnivores, LH = large herbivores
-WTT_average = (WTT_occ_proba_SB_stack$WTT_LC + WTT_occ_proba_SB_stack$WTT_LH) / 2
-plot(WTT_average) 
-
-# Where species already as binary
-# Current distribution binary (= with only 1s)
-M_sum_binary <- ifel(WTT_occ_proba_SB_stack$M_sum > 0, 1, NA)
-plot(M_sum_binary)
-
-# Potential expansion with a combined probability of at least 0.5 (threshold)
-P_SUM_threshold <- classify(WTT_occ_proba_SB_stack$P_SUM, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
-# Plot to check
-plot(P_SUM_threshold, main = "Binary probability (≥0.5 = 1)")
-
-```
-
-Social conflicts: livestock density, current Canis lipus and Ursus arctos distribution, potential Canis lipus and Ursus arctos distribution
+Clean data for social conflicts: livestock density, current Canis lipus and Ursus arctos distribution, potential Canis lipus and Ursus arctos distribution
 
 ```{r}
 
@@ -1098,36 +1126,2142 @@ plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
 
 ```
 
-## Step n
+## 3.4: Export each layer so there is no need to process all the data each time
 
 ```{r}
 
+writeRaster(npp_masked, filename = file.path(output_dir, "layers_maps_npp_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(aban_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(hanpp_T8_masked, filename = file.path(output_dir, "layers_maps_hanpp_T8_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(hanpp_T5_masked, filename = file.path(output_dir, "layers_maps_hanpp_T5_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(meff_T8_masked, filename = file.path(output_dir, "layers_maps_meff_T8_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(meff_T5_masked, filename = file.path(output_dir, "layers_maps_meff_T5_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(WTT_average_masked, filename = file.path(output_dir, "layers_maps_WTT_average_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(M_sum_binary_sub, filename = file.path(output_dir, "layers_maps_M_sum_binary_sub_250716.tif"), overwrite = TRUE)
+
+writeRaster(P_SUM_threshold_masked, filename = file.path(output_dir, "layers_maps_P_SUM_threshold_masked_250716.tif"), overwrite = TRUE)
+
+livestock_sum_no_pigs <- conflict_raster_stack_complete_masked$livestock_sum_no_pigs
+writeRaster(livestock_sum_no_pigs, filename = file.path(output_dir, "layers_maps_livestock_sum_no_pigs_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(M_sub, filename = file.path(output_dir, "layers_maps_wolf_bear_masked_250716.tif"), overwrite = TRUE)
+
+writeRaster(P_CN_UA_threshold_masked, filename = file.path(output_dir, "layers_maps_P_CN_UA_threshold_masked_250716.tif"), overwrite = TRUE)
+
+```
+
+## II. map each data individually (to prepare the figure in supplementary materials)
+
+# 1. Current
+
+Low land use intensity
+
+```{r}
+
+naturalness <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_hanpp_T8_masked_250716.tif"
+naturalness <- rast(naturalness)
+plot(naturalness)
+
+# Convert raster to data frame for ggplot
+df_nat <- as.data.frame(naturalness, xy = TRUE)
+names(df_nat)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_nat$value <- factor(df_nat$value, levels = c(0, 1))
+
+# Define colors
+nat_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#f29842"   # dark green for natural areas
+)
+
+nat_labels <- c(
+  "0" = "Other land",
+  "1" = "High naturalness"
+)
+
+# Plot with ggplot
+map_naturalness <- ggplot(df_nat, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = nat_colors,
+    breaks = c("1"),
+    labels = nat_labels["1"],   # only show "Natural areas" in legend
+    name = "Naturalness"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "High naturalness in Europe")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_naturalness_250916_1.png'),
+  plot = map_naturalness,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+
+```
+
+Effective mesh size
+
+```{r}
+
+meff <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_meff_T8_masked_250716.tif"
+meff <- rast(meff)
+plot(meff)
+
+# Convert raster to data frame for ggplot
+df_meff <- as.data.frame(meff, xy = TRUE)
+names(df_meff)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_meff$value <- factor(df_meff$value, levels = c(0, 1))
+
+# Define colors
+meff_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#f29842"   # orange
+)
+
+meff_labels <- c(
+  "0" = "Other land",
+  "1" = "High meff"
+)
+
+# Plot with ggplot
+map_meff <- ggplot(df_meff, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = meff_colors,
+    breaks = c("1"),
+    labels = meff_labels["1"],   # only show orange in legend
+    name = "Effective mesh size"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "High effective mesh size in Europe")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_meff_250916_1.png'),
+  plot = map_meff,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+
+```
+
+Current 8 mammal species for ecotourism
+
+```{r}
+
+ecotourism <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_M_sum_binary_sub_250716.tif"
+ecotourism <- rast(ecotourism)
+plot(ecotourism)
+
+# Convert raster to data frame for ggplot
+df_ecotourism <- as.data.frame(ecotourism, xy = TRUE)
+names(df_ecotourism)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_ecotourism$value <- factor(df_ecotourism$value, levels = c(0, 1))
+
+# Define colors
+ecotourism_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#f29842"   # orange
+)
+
+ecotourism_labels <- c(
+  "0" = "Other land",
+  "1" = "8 large mammal species"
+)
+
+# Plot with ggplot
+map_ecotourism <- ggplot(df_ecotourism, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = ecotourism_colors,
+    breaks = c("1"),
+    labels = ecotourism_labels["1"],   # only show orange in legend
+    name = "Current distribution without expansion"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Large mammals current distribution without expansion in Europe")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_current_sp_250916_1.png'),
+  plot = map_ecotourism,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+
+```
+
+Carnivores current
+
+```{r}
+
+carnivores <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_wolf_bear_masked_250716.tif"
+carnivores <- rast(carnivores)
+plot(carnivores)
+
+# Convert raster to data frame for ggplot
+df_carnivores <- as.data.frame(carnivores, xy = TRUE)
+names(df_carnivores)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_carnivores$value <- factor(df_carnivores$value, levels = c(0, 1))
+
+# Define colors
+carnivores_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#f29842"   # orange
+)
+
+carnivores_labels <- c(
+  "0" = "Other land",
+  "1" = "Canis lupus lupus & Ursus arctos"
+)
+
+# Plot with ggplot
+map_carnivores <- ggplot(df_carnivores, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = carnivores_colors,
+    breaks = c("1"),
+    labels = carnivores_labels["1"],   # only show orange in legend
+    name = "Current distribution without expansion"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Large carnivores current distribution without expansion in Europe")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_current_carnivores_250916_1.png'),
+  plot = map_carnivores,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+# 2. Potential
+
+Abandonment
+
+```{r}
+
+abandonment <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_abandonment_masked_250716.tif"
+abandonment <- rast(abandonment)
+plot(abandonment)
+
+# Convert raster to data frame for ggplot
+df_aband <- as.data.frame(abandonment, xy = TRUE)
+names(df_aband)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_aband$value <- factor(df_aband$value, levels = c(0, 1))
+
+# Define colors
+aband_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#AB47BC"   # purple
+)
+
+aband_labels <- c(
+  "0" = "Other land",
+  "1" = "Potential abandonment"
+)
+
+# Plot with ggplot
+map_aband <- ggplot(df_aband, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = aband_colors,
+    breaks = c("1"),
+    labels = aband_labels["1"],   # only show purple in legend
+    name = "Abandonment status"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Areas potentially abandonned")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_aband_250916_1.png'),
+  plot = map_aband,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Species probable expansion
+
+```{r}
+
+mammal_exp <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_P_SUM_threshold_masked_250716.tif"
+mammal_exp <- rast(mammal_exp)
+plot(mammal_exp)
+
+# Convert raster to data frame for ggplot
+df_mam_exp <- as.data.frame(mammal_exp, xy = TRUE)
+names(df_mam_exp)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_mam_exp$value <- factor(df_mam_exp$value, levels = c(0, 1))
+
+# Define colors
+mam_exp_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#AB47BC"   # purple
+)
+
+mam_exp_labels <- c(
+  "0" = "Other land",
+  "1" = "Proba >= 0.5"
+)
+
+# Plot with ggplot
+map_mam_exp <- ggplot(df_mam_exp, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = mam_exp_colors,
+    breaks = c("1"),
+    labels = mam_exp_labels["1"],   # only show purple in legend
+    name = "Potential mammal expansion"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Potential expansion of 8 mammal species")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_mam_exp_250916_2.png'),
+  plot = map_mam_exp,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Carnivores probable expansion
+
+```{r}
+
+carn_exp <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_P_CN_UA_threshold_masked_250716.tif"
+carn_exp <- rast(carn_exp)
+plot(carn_exp)
+
+# Convert raster to data frame for ggplot
+df_carn_exp <- as.data.frame(carn_exp, xy = TRUE)
+names(df_carn_exp)[3] <- "value"
+
+# If it's binary (0/1), convert to factor
+df_carn_exp$value <- factor(df_carn_exp$value, levels = c(0, 1))
+
+# Define colors
+carn_exp_colors <- c(
+  "0" = "#FFFFFF",  # white for 0
+  "1" = "#AB47BC"   # purple
+)
+
+carn_exp_labels <- c(
+  "0" = "Other land",
+  "1" = "Proba >= 0.5"
+)
+
+# Plot with ggplot
+map_carn_exp <- ggplot(df_carn_exp, aes(x = x, y = y, fill = value)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = carn_exp_colors,
+    breaks = c("1"),
+    labels = carn_exp_labels["1"],   # only show purple in legend
+    name = "Potential carnivore expansion"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Potential expansion of Canis lupus lupus and Ursus arctos")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_carn_exp_250916_1.png'),
+  plot = map_carn_exp,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+# 3. Benefits / proxy of outcome (quantiles)
+
+Carbon potential
+
+```{r}
+
+carbon_pot <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_pot_carbon_masked_250716.tif"
+carbon_pot <- rast(carbon_pot)
+plot(carbon_pot)
+
+# Step 1: Compute quantile breaks (10 bins)
+breaks_carbon <- quantile(values(carbon_pot), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+# Step 2: Classify into quantile bins (1–10)
+carbon_class <- classify(
+  carbon_pot,
+  rcl = matrix(c(
+    breaks_carbon[1],  breaks_carbon[2],  1,
+    breaks_carbon[2],  breaks_carbon[3],  2,
+    breaks_carbon[3],  breaks_carbon[4],  3,
+    breaks_carbon[4],  breaks_carbon[5],  4,
+    breaks_carbon[5],  breaks_carbon[6],  5,
+    breaks_carbon[6],  breaks_carbon[7],  6,
+    breaks_carbon[7],  breaks_carbon[8],  7,
+    breaks_carbon[8],  breaks_carbon[9],  8,
+    breaks_carbon[9],  breaks_carbon[10], 9,
+    breaks_carbon[10], breaks_carbon[11], 10
+  ), ncol = 3, byrow = TRUE)
+)
+
+# Step 3: Convert to data frame
+df_carbon <- as.data.frame(carbon_class, xy = TRUE)
+names(df_carbon)[3] <- "bin"
+
+# Step 4: Map with grey gradient
+map_carbon <- ggplot(df_carbon, aes(x = x, y = y, fill = bin)) +
+  geom_tile() +
+  scale_fill_gradientn(
+    colors = gray.colors(10, start = 0.9, end = 0.2), # light grey (0.9) → dark grey (0.2)
+    breaks = 1:10,
+    labels = round(breaks_carbon[-1], 2),   # numeric labels from quantile breaks
+    name = "Potential carbon storage (tC/km2)"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Potential carbon storage (10-quantile map)")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_carbon_pot_250916_1.png'),
+  plot = map_carbon,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Climate velocity
+
+```{r}
+
+cv <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_cv_masked_250716.tif"
+cv <- rast(cv)
+plot(cv)
+
+# Step 1: Compute quantile breaks (10 bins)
+breaks_cv <- quantile(values(cv), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+# Step 2: Classify into quantile bins (1–10)
+cv_class <- classify(
+  cv,
+  rcl = matrix(c(
+    breaks_cv[1],  breaks_cv[2],  1,
+    breaks_cv[2],  breaks_cv[3],  2,
+    breaks_cv[3],  breaks_cv[4],  3,
+    breaks_cv[4],  breaks_cv[5],  4,
+    breaks_cv[5],  breaks_cv[6],  5,
+    breaks_cv[6],  breaks_cv[7],  6,
+    breaks_cv[7],  breaks_cv[8],  7,
+    breaks_cv[8],  breaks_cv[9],  8,
+    breaks_cv[9],  breaks_cv[10], 9,
+    breaks_cv[10], breaks_cv[11], 10
+  ), ncol = 3, byrow = TRUE)
+)
+
+# Step 3: Convert to data frame
+df_cv <- as.data.frame(cv_class, xy = TRUE)
+names(df_cv)[3] <- "bin"
+
+# Step 4: Map with grey gradient
+map_cv <- ggplot(df_cv, aes(x = x, y = y, fill = bin)) +
+  geom_tile() +
+  scale_fill_gradientn(
+    colors = gray.colors(10, start = 0.9, end = 0.2), # light grey (0.9) → dark grey (0.2)
+    breaks = 1:10,
+    labels = round(breaks_cv[-1], 2),   # numeric labels from quantile breaks
+    name = "Climate velocity (km/year)"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Climate velocity (10-quantile map)")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_cv_250916_1.png'),
+  plot = map_cv,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Number of people travelling
+
+```{r}
+
+WTT_occ_proba_SB_stack <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif"
+WTT_occ_proba_SB_stack <- rast(WTT_occ_proba_SB_stack)
+names(WTT_occ_proba_SB_stack)
+WTT_average = (WTT_occ_proba_SB_stack$WTT_LC + WTT_occ_proba_SB_stack$WTT_LH) / 2
+plot(WTT_average)
+
+# Step 1: Compute quantile breaks (10 bins)
+breaks_WTT <- quantile(values(WTT_average), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+# Step 2: Classify into quantile bins (1–10)
+WTT_class <- classify(
+  WTT_average,
+  rcl = matrix(c(
+    breaks_WTT[1],  breaks_WTT[2],  1,
+    breaks_WTT[2],  breaks_WTT[3],  2,
+    breaks_WTT[3],  breaks_WTT[4],  3,
+    breaks_WTT[4],  breaks_WTT[5],  4,
+    breaks_WTT[5],  breaks_WTT[6],  5,
+    breaks_WTT[6],  breaks_WTT[7],  6,
+    breaks_WTT[7],  breaks_WTT[8],  7,
+    breaks_WTT[8],  breaks_WTT[9],  8,
+    breaks_WTT[9],  breaks_WTT[10], 9,
+    breaks_WTT[10], breaks_WTT[11], 10
+  ), ncol = 3, byrow = TRUE)
+)
+
+# Step 3: Convert to data frame
+df_WTT <- as.data.frame(WTT_class, xy = TRUE)
+names(df_WTT)[3] <- "bin"
+
+# Step 4: Map with grey gradient
+map_WTT <- ggplot(df_WTT, aes(x = x, y = y, fill = bin)) +
+  geom_tile() +
+  scale_fill_gradientn(
+    colors = gray.colors(10, start = 0.9, end = 0.2), # light grey (0.9) → dark grey (0.2)
+    breaks = 1:10,
+    labels = round(breaks_WTT[-1], 2),   # numeric labels from quantile breaks
+    name = "People travelling (count/km2)"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Number of people willing to travel (10-quantile map)")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_WTT_250916_1.png'),
+  plot = map_WTT,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Livestock
+
+```{r}
+
+livestock <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_livestock_sum_no_pigs_masked_250716.tif"
+livestock <- rast(livestock)
+plot(livestock)
+
+# Step 1: Compute quantile breaks (10 bins)
+breaks_livestock <- quantile(values(livestock), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+# Step 2: Classify into quantile bins (1–10)
+livestock_class <- classify(
+  livestock,
+  rcl = matrix(c(
+    breaks_livestock[1],  breaks_livestock[2],  1,
+    breaks_livestock[2],  breaks_livestock[3],  2,
+    breaks_livestock[3],  breaks_livestock[4],  3,
+    breaks_livestock[4],  breaks_livestock[5],  4,
+    breaks_livestock[5],  breaks_livestock[6],  5,
+    breaks_livestock[6],  breaks_livestock[7],  6,
+    breaks_livestock[7],  breaks_livestock[8],  7,
+    breaks_livestock[8],  breaks_livestock[9],  8,
+    breaks_livestock[9],  breaks_livestock[10], 9,
+    breaks_livestock[10], breaks_livestock[11], 10
+  ), ncol = 3, byrow = TRUE)
+)
+
+# Step 3: Convert to data frame
+df_livestock <- as.data.frame(livestock_class, xy = TRUE)
+names(df_livestock)[3] <- "bin"
+
+# Step 4: Map with inverted grey gradient
+map_livestock <- ggplot(df_livestock, aes(x = x, y = y, fill = bin)) +
+  geom_tile() +
+  scale_fill_gradientn(
+    colors = gray.colors(10, start = 0.2, end = 0.9), # dark grey (low) → light grey (high)
+    breaks = 1:10,
+    labels = round(breaks_livestock[-1], 2),   # numeric labels from quantile breaks
+    name = "Livestock density (count/km²)"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Livestock density (sheep, cow, goat, reindeer) (10-quantile map)")
+
+ggsave(
+  file.path(output_dir, 'intermediary_map_livestock_250916_1.png'),
+  plot = map_livestock,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+## III. produce the bivariate maps
+
+Climate change mitigation (potential carbon x (abandonment and low land use intensity))
+
+```{r}
+
+# Step 1: Round NPP and classify into 10 quantiles
+pot_carbon_ceil <- ceiling(pot_carbon_masked)
+pot_carbon_breaks <- quantile(values(pot_carbon_ceil), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+pot_carbon_classified <- classify(pot_carbon_ceil, rcl = matrix(c(
+  pot_carbon_breaks[1] - 0.00001, pot_carbon_breaks[2], 1,
+  pot_carbon_breaks[2], pot_carbon_breaks[3], 2,
+  pot_carbon_breaks[3], pot_carbon_breaks[4], 3,
+  pot_carbon_breaks[4], pot_carbon_breaks[5], 4,
+  pot_carbon_breaks[5], pot_carbon_breaks[6], 5,
+  pot_carbon_breaks[6], pot_carbon_breaks[7], 6,
+  pot_carbon_breaks[7], pot_carbon_breaks[8], 7,
+  pot_carbon_breaks[8], pot_carbon_breaks[9], 8,
+  pot_carbon_breaks[9], pot_carbon_breaks[10], 9,
+  pot_carbon_breaks[10], pot_carbon_breaks[11], 10
+), ncol = 3, byrow = TRUE))
+
+# Step 2: Mutually exclusive masks
+abandonment_mask <- ifel(aban_masked == 1, 1, 0)
+plot(abandonment_mask)
+hanpp_mask <- ifel((hanpp_T8_masked == 1) & (aban_masked != 1), 1, 0)
+plot(hanpp_mask)
+residual_mask <- ifel((aban_masked != 1) & (hanpp_T8_masked != 1), 1, 0)
+plot(residual_mask)
+
+# Step 3: Offset and combine values by category
+abandonment_layer_mitigation <- ifel(abandonment_mask == 1, pot_carbon_classified + 10, NA)  # 11–20
+hanpp_layer <- ifel(hanpp_mask == 1, pot_carbon_classified + 20, NA)              # 21–30
+no_abandonment_layer <- ifel(residual_mask == 1, pot_carbon_classified, NA)       # 1–10
+
+# Step 4: Merge into a single raster
+pot_carbon_abandonment_combined <- merge(abandonment_layer_mitigation, hanpp_layer, no_abandonment_layer)
+par(mfrow = c(1,1))
+plot(pot_carbon_abandonment_combined)
+plot(abandonment_layer_mitigation)
+
+# Step 5: Convert to dataframe
+pot_carbon_abandonment_df <- as.data.frame(pot_carbon_abandonment_combined, xy = TRUE)
+colnames(pot_carbon_abandonment_df) <- c("x", "y", "value")
+
+# Step 6: Custom 30-color palette
+abandon_palette <- c(
+  # 1–10: Greys for no abandonment
+  "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
+  "#B0B0B0", "#9E9E9E", "#7D7D7D", "#616161", "#424242",
+  
+  # 11–20: Purple for abandonment
+  "#F3E5F5", "#E1BEE7", "#CE93D8", "#BA68C8", "#AB47BC",
+  "#9C27B0", "#8E24AA", "#7B1FA2", "#6A1B9A", "#4A148C",
+  
+  # 21–30: Browns for HANPP
+  "#fff4e3", "#fee0b6", "#fdd697", "#fdb863", "#f29842",
+  "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
+)
+
+# Step 7: Map value to colors
+pot_carbon_abandonment_df <- pot_carbon_abandonment_df %>%
+  mutate(color = ifelse(!is.na(value), abandon_palette[value], "#d3d3d3"))
+
+# Step 8: Map
+pot_carbon_abandonment_map <- ggplot() +
+  geom_tile(data = pot_carbon_abandonment_df, aes(x = x, y = y, fill = color)) +
+  scale_fill_identity() +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  ) +
+  labs(
+    title = "Climate Change Mitigation on Abandoned Farmlands"
+  ) +
+  theme(
+    plot.title = element_text(
+      size = 18,        # font size (increase/decrease as needed)
+      face = "bold",    # makes it bold
+      hjust = 0.5       # centers the title
+    )
+  )
+
+# Step 9: Save map
+# png
+ggsave(
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_3.png'),
+  plot = pot_carbon_abandonment_map,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+# svg (I tried to save it as svg so it would be easier to modify in inkscape but it's bugging and I am unsure it is really needed so I'll not do it for now)
+install.packages("svglite")
+library(svglite)
+ggsave(
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_1.svg'),
+  plot = pot_carbon_abandonment_map,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+# Step 10: Legend
+legend_df_pot_carbon <- expand.grid(
+  base_level = 1:10,
+  category = c("No abandonment", "Abandonment", "HANPP")
+)
+
+legend_df_pot_carbon <- legend_df_pot_carbon %>%
+  mutate(
+    category = recode(
+      category,
+      "No abandonment" = "No future abandonment",
+      "Abandonment" = "Probable future abandonment",
+      "HANPP" = "Current high naturalness"
+    ),
+    color = case_when(
+      category == "No future abandonment" ~ abandon_palette[base_level],
+      category == "Probable future abandonment" ~ abandon_palette[base_level + 10],
+      category == "Current high naturalness" ~ abandon_palette[base_level + 20]
+    )
+  )
+
+pot_carbon_legend_limits <- round(pot_carbon_breaks)
+
+pot_carbon_abandonment_legend <- ggplot(legend_df_pot_carbon, aes(x = base_level, y = category, fill = color)) +
+  geom_tile() +
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(0.5, 10.5, by = 1),
+    labels = pot_carbon_legend_limits,
+    position = 'top'
+  ) +
+  labs(
+    x = "Potential carbon storage (tC/km2)",
+    y = "Land status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(size = 14, angle = 0, vjust = 1.6, hjust = 1, margin = margin(r = -80)),
+    axis.text = element_text(size = 11),
+    axis.text.x = element_text(size = 11, angle = 90),
+    axis.text.x.top = element_text(size = 11, hjust = 0),
+    axis.title.x.top = element_text(size = 14, margin = margin(b = 20)),
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 10, 10, 100)
+  ) +
+  coord_fixed(ratio = 0.5)
+
+plot(pot_carbon_abandonment_legend)
+
+ggsave(
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_legend_3.png'),
+  plot = pot_carbon_abandonment_legend,
+  width = 24, height = 10, units = 'cm', dpi = 300
+)
+
+# Step 11: Combine map and legend
+final_plot_pot_carbon <- cowplot::plot_grid(
+  pot_carbon_abandonment_map,
+  pot_carbon_abandonment_legend,
+  ncol = 2
+)
+
+# Step 12: Save final composite
+ggsave(
+  file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend_6_T8.png"),
+  plot = final_plot_pot_carbon,
+  width = 40, height = 25, units = "cm", dpi = 300
+)
+
+
+```
+
+Climate change adaptation (climate velocity x (abandonment and effective mesh size))
+
+```{r}
+
+# Step 1: Round CV and classify into 10 quantiles
+cv_ceil <- ceiling(cv_masked)
+plot(cv_masked)
+cv_breaks <- quantile(values(cv_ceil), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+cv_classified <- classify(cv_ceil, rcl = matrix(c(
+  cv_breaks[1] - 0.00001, cv_breaks[2], 1,
+  cv_breaks[2], cv_breaks[3], 2,
+  cv_breaks[3], cv_breaks[4], 3,
+  cv_breaks[4], cv_breaks[5], 4,
+  cv_breaks[5], cv_breaks[6], 5,
+  cv_breaks[6], cv_breaks[7], 6,
+  cv_breaks[7], cv_breaks[8], 7,
+  cv_breaks[8], cv_breaks[9], 8,
+  cv_breaks[9], cv_breaks[10], 9,
+  cv_breaks[10], cv_breaks[11], 10
+), ncol = 3, byrow = TRUE))
+
+# Step 2: Mutually exclusive masks
+abandonment_mask <- ifel(aban_masked == 1, 1, 0)
+meff_mask <- ifel((meff_T8_masked == 1) & (aban_masked != 1), 1, 0)
+residual_mask <- ifel((aban_masked != 1) & (meff_T8_masked != 1), 1, 0)
+
+# Step 3: Offset and combine values by category
+abandonment_layer_adaptation <- ifel(abandonment_mask == 1, cv_classified + 10, NA)  # 11–20
+meff_layer <- ifel(meff_mask == 1, cv_classified + 20, NA)                # 21–30
+no_abandonment_layer <- ifel(residual_mask == 1, cv_classified, NA)       # 1–10
+
+# Step 4: Merge into a single raster
+cv_abandonment_combined <- merge(abandonment_layer_adaptation, meff_layer, no_abandonment_layer)
+plot(cv_abandonment_combined)
+plot(abandonment_layer_adaptation)
+
+# Step 5: Convert to dataframe
+cv_abandonment_df <- as.data.frame(cv_abandonment_combined, xy = TRUE)
+colnames(cv_abandonment_df) <- c("x", "y", "value")
+
+# Step 6: Custom 30-color palette
+abandon_palette <- c(
+  # 1–10: Greys for no abandonment
+  "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
+  "#B0B0B0", "#9E9E9E", "#7D7D7D", "#616161", "#424242",
+  # 11–20: Purple for abandonment
+  "#F3E5F5", "#E1BEE7", "#CE93D8", "#BA68C8", "#AB47BC",
+  "#9C27B0", "#8E24AA", "#7B1FA2", "#6A1B9A", "#4A148C",
+  # 21–30: Browns for MEFF
+  "#fff4e3", "#fee0b6", "#fdd697", "#fdb863", "#f29842",
+  "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
+)
+
+# Step 7: Map value to colors
+cv_abandonment_df <- cv_abandonment_df %>%
+  mutate(color = ifelse(!is.na(value), abandon_palette[value], "#d3d3d3"))
+
+# Step 8: Map
+cv_abandonment_map <- ggplot() +
+  geom_tile(data = cv_abandonment_df, aes(x = x, y = y, fill = color)) +
+  scale_fill_identity() +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )  +
+  labs(
+    title = "Climate Change Adaptation for Ecosystem Resilience"
+  ) +
+  theme(
+    plot.title = element_text(
+      size = 18,        # font size (increase/decrease as needed)
+      face = "bold",    # makes it bold
+      hjust = 0.5       # centers the title
+    ))
+  
+
+# Step 9: Save map
+ggsave(
+  file.path(output_dir, 'cv_abandonment_meff_map_1.png'),
+  plot = cv_abandonment_map,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+# Step 10: Legend
+legend_df_cv <- expand.grid(
+  base_level = 1:10,
+  category = c("No abandonment", "Abandonment", "MEFF")
+)
+
+legend_df_cv <- legend_df_cv %>%
+  mutate(
+    category = recode(
+      category,
+      "No abandonment" = "No future abandonment",
+      "Abandonment" = "Probable future abandonment",
+      "MEFF" = "Current high connectivity"
+    ),
+    color = case_when(
+      category == "No future abandonment" ~ abandon_palette[base_level],
+      category == "Probable future abandonment" ~ abandon_palette[base_level + 10],
+      category == "Current high connectivity" ~ abandon_palette[base_level + 20]
+    )
+  )
+
+cv_legend_limits <- round(cv_breaks)
+
+cv_abandonment_legend <- ggplot(legend_df_cv, aes(x = base_level, y = category, fill = color)) +
+  geom_tile() +
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(0.5, 10.5, by = 1),
+    labels = cv_legend_limits,
+    position = 'top'
+  ) +
+  labs(
+    x = "Climate velocity (km/year)",
+    y = "Land status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(size = 14, angle = 0, vjust = 1.6, hjust = 1, margin = margin(r = -80)),
+    axis.text = element_text(size = 11),
+    axis.text.x = element_text(size = 11, angle = 90),
+    axis.text.x.top = element_text(size = 11, hjust = 0),
+    axis.title.x.top = element_text(size = 14, margin = margin(b = 20)),
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 10, 10, 100)
+  ) +
+  coord_fixed(ratio = 0.5)
+
+plot(cv_abandonment_legend)
+
+ggsave(
+  file.path(output_dir, 'cv_abandonment_meff_legend_1.png'),
+  plot = cv_abandonment_legend,
+  width = 24, height = 10, units = 'cm', dpi = 300
+)
+
+# Step 11: Combine map and legend
+final_plot_cv <- cowplot::plot_grid(
+  cv_abandonment_map,
+  cv_abandonment_legend,
+  ncol = 2
+)
+
+# Step 12: Save final composite
+ggsave(
+  file.path(output_dir, "cv_abandonment_meff_map_with_legend_4_T8.png"),
+  plot = final_plot_cv,
+  width = 40, height = 25, units = "cm", dpi = 300
+)
+
+
+```
+
+Social benefits (people travelling x (species current distribution and potential distribution))
+
+```{r}
+
+# Bivariate mapping: binary species expansion x 10 levels of people travelling
+
+# Step 0: remove overlap between current and proba
+M_sum_binary_sub <- M_sum_binary_masked - P_SUM_threshold_masked
+M_sum_binary_sub <- ifel(M_sum_binary_sub == -1, 0, M_sum_binary_sub)
+plot(M_sum_binary_sub)
+
+# Step 1: Round NPP and classify into 10 quantiles
+WTT_ceil <- ceiling(WTT_average_masked)
+WTT_breaks <- quantile(values(WTT_ceil), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+
+WTT_classified <- classify(WTT_ceil, rcl = matrix(c(
+  WTT_breaks[1] - 0.00001, WTT_breaks[2], 1,
+  WTT_breaks[2], WTT_breaks[3], 2,
+  WTT_breaks[3], WTT_breaks[4], 3,
+  WTT_breaks[4], WTT_breaks[5], 4,
+  WTT_breaks[5], WTT_breaks[6], 5,
+  WTT_breaks[6], WTT_breaks[7], 6,
+  WTT_breaks[7], WTT_breaks[8], 7,
+  WTT_breaks[8], WTT_breaks[9], 8,
+  WTT_breaks[9], WTT_breaks[10], 9,
+  WTT_breaks[10], WTT_breaks[11], 10
+), ncol = 3, byrow = TRUE))
+
+# Step 2: Combine species logic for binary mapping (exclusive values)
+# Prioritize M_SUM > P_SUM > No species
+WTT_M_sum <- ifel(M_sum_binary_sub == 1 & P_SUM_threshold_masked == 0, WTT_classified + 20, NA)
+WTT_P_sum <- ifel(P_SUM_threshold_masked == 1 & M_sum_binary_sub == 0, WTT_classified + 10, NA)
+WTT_no_species <- ifel(M_sum_binary_sub == 0 & P_SUM_threshold_masked == 0, WTT_classified, NA)
+
+# Step 3: Combine using cover() to prioritize non-NA in order
+WTT_species_combined <- merge(WTT_no_species, WTT_P_sum, WTT_M_sum)
+
+# Step 4: Convert to dataframe
+WTT_species_df <- as.data.frame(WTT_species_combined, xy = TRUE)
+colnames(WTT_species_df) <- c("x", "y", "value")
+
+# Step 5: Define 30-class palette
+abandon_palette <- c(
+  # 1-10: Shades of grey for no abandonment
+  "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
+  "#B0B0B0", "#9E9E9E", "#7D7D7D", "#616161", "#424242",
+  # 11-20: Shades of purple for P_SUM species
+  "#F3E5F5", "#E1BEE7", "#CE93D8", "#BA68C8", "#AB47BC",
+  "#9C27B0", "#8E24AA", "#7B1FA2", "#6A1B9A", "#4A148C",
+  # 21-30: Shades of brown for M_SUM species
+  "#fff4e3", "#fee0b6", "#fdd697", "#fdb863", "#f29842",
+  "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
+)
+
+# Step 6: Map values to color
+WTT_species_df <- WTT_species_df %>%
+  mutate(color = case_when(
+    value >= 1  & value <= 30 ~ abandon_palette[value],
+    TRUE ~ "#d3d3d3"
+  ))
+
+# Step 7: Map
+WTT_species_map <- ggplot() +
+  geom_tile(data = WTT_species_df, aes(x = x, y = y, fill = color)) +
+  scale_fill_identity() +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )  +
+  labs(
+    title = "Social Benefits through increased ecotourism"
+  ) +
+  theme(
+    plot.title = element_text(
+      size = 18,        # font size (increase/decrease as needed)
+      face = "bold",    # makes it bold
+      hjust = 0.5       # centers the title
+    ))
+ 
+# Step C: Save
+ggsave(
+  file.path(output_dir, 'WTT_with_species_binary_map_2.png'),
+  plot = WTT_species_map,
+  width = 26,
+  height = 25,
+  units = 'cm',
+  dpi = 300
+)
+
+###### Legend
+
+# Step 1: Build the legend data frame
+legend_df_WTT <- expand.grid(
+  base_level = 1:10,
+  expansion = c("No species gained", "P_SUM gained", "M_SUM gained")
+)
+
+# Step 5: Define 30-class palette
+
+legend_palette <- c(
+  # 1-10: Shades of grey for no abandonment
+  "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
+  "#B0B0B0", "#9E9E9E", "#7D7D7D", "#616161", "#424242",
+  # 11-20: Shades of purple for P_SUM species
+  "#F3E5F5", "#E1BEE7", "#CE93D8", "#BA68C8", "#AB47BC",
+  "#9C27B0", "#8E24AA", "#7B1FA2", "#6A1B9A", "#4A148C",
+  # 21-30: Shades of brown for M_SUM species
+  "#fff4e3", "#fee0b6", "#fdd697", "#fdb863", "#f29842",
+  "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
+)
+
+# Step 2: Map the correct colors
+legend_df_WTT <- legend_df_WTT %>%
+  mutate(
+    expansion = recode(
+      expansion,
+      "No species gained" = "Species absent",
+      "P_SUM gained" = "Species gained (proba > 0.5)",
+      "M_SUM gained" = "No new species"
+    ),
+    color = case_when(
+      expansion == "Species absent" ~ legend_palette[base_level],
+      expansion == "Species gained (proba > 0.5)" ~ legend_palette[base_level + 10],
+      expansion == "No new species" ~ legend_palette[base_level + 20]
+    )
+  )
+
+# Step 3: Use rounded NPP quantile labels
+WTT_legend_limits <- round(WTT_breaks)
+
+# Step 4: Plot the legend
+WTT_species_legend <- ggplot(legend_df_WTT, aes(x = base_level, y = expansion, fill = color)) +
+  geom_tile() +
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(0.5, 10.5, by = 1),
+    labels = WTT_legend_limits,
+    position = 'top'
+  ) +
+  labs(
+    x = "Number of people travelling (count/km2)",
+    y = "Species expansion status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(size = 14, angle = 0, vjust = 1.6, hjust = 1, margin = margin(r = -80)),
+    axis.text = element_text(size = 11),
+    axis.text.x = element_text(size = 11, angle = 90),
+    axis.text.x.top = element_text(size = 11, hjust = 0),
+    axis.title.x.top = element_text(size = 14, margin = margin(b = 20)),
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 10, 10, 100)
+  ) +
+  coord_fixed(ratio = 0.5)
+
+# Step 5: Display
+plot(WTT_species_legend)
+
+ggsave(
+  file.path(output_dir, 'WTT_with_species_binary_legend_1.png'),
+  plot = WTT_species_legend,
+  width = 24, height = 10, units = 'cm', dpi = 300
+)
+
+############ Combine map and legend
+
+# Combine the fixed legend with the map
+final_plot <- plot_grid(
+  WTT_species_map,
+  WTT_species_legend,
+  ncol = 2
+)
+
+# Optionally save
+ggsave(
+  file.path(output_dir, "WTT_with_species_binary_map_with_legend_borders_pruple_3levels_2.png"),
+  plot = final_plot,
+  width = 40,
+  height = 25,
+  units = "cm",
+  dpi = 300
+)
 
 
 
 ```
 
-## Step n
+Social conflicts (livestock density x (carnivores current distribution and potential distribution))
 
 ```{r}
 
+# Bivariate mapping: binary species expansion x 10 levels of people travelling (wolf & bear only)
 
+# Step 0: Remove overlap between current and proba
+M_sub <- M_CN_UA_binary_masked - P_CN_UA_threshold_masked
+M_sub <- ifel(M_sub == -1, 0, M_sub)
 
+# Step 1: Livestock and classify into 10 quantiles
+livestock_ceil <- ceiling(conflict_raster_stack_complete_masked$livestock_sum_no_pigs)
+livestock_breaks <- quantile(values(livestock_ceil), probs = seq(1, 0, length.out = 11), na.rm = TRUE)
+
+# Step 2: Create classification matrix with bins 10 → 1, but keep ranges increasing
+reversed_class_matrix <- matrix(c(
+  livestock_breaks[11] - 0.00001, livestock_breaks[10], 10,
+  livestock_breaks[10], livestock_breaks[9], 9,
+  livestock_breaks[9],  livestock_breaks[8], 8,
+  livestock_breaks[8],  livestock_breaks[7], 7,
+  livestock_breaks[7],  livestock_breaks[6], 6,
+  livestock_breaks[6],  livestock_breaks[5], 5,
+  livestock_breaks[5],  livestock_breaks[4], 4,
+  livestock_breaks[4],  livestock_breaks[3], 3,
+  livestock_breaks[3],  livestock_breaks[2], 2,
+  livestock_breaks[2],  livestock_breaks[1], 1
+), ncol = 3, byrow = TRUE)
+livestock_classified_10 <- classify(livestock_ceil, rcl = reversed_class_matrix)
+plot(livestock_classified_10)
+
+# Step 2: Encode states
+livestock_M <- ifel(M_sub == 1 & P_CN_UA_threshold_masked == 0, livestock_classified_10 + 20, NA)
+livestock_P <- ifel(P_CN_UA_threshold_masked == 1 & M_sub == 0, livestock_classified_10 + 10, NA)
+livestock_none <- ifel(M_sub == 0 & P_CN_UA_threshold_masked == 0, livestock_classified_10, NA)
+
+# Step 3: Merge the rasters
+livestock_combined <- merge(livestock_none, livestock_P, livestock_M)
+
+# Step 4: Convert to dataframe
+livestock_df <- as.data.frame(livestock_combined, xy = TRUE)
+colnames(livestock_df) <- c("x", "y", "value")
+
+# Step 5: Define 30-class palette
+abandon_palette <- c(
+  # 1-10: Shades of grey for no abandonment
+  "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
+  "#B0B0B0", "#9E9E9E", "#7D7D7D", "#616161", "#424242",
+  # 11-20: Shades of purple for P_SUM species
+  "#F3E5F5", "#E1BEE7", "#CE93D8", "#BA68C8", "#AB47BC",
+  "#9C27B0", "#8E24AA", "#7B1FA2", "#6A1B9A", "#4A148C",
+  # 21-30: Shades of brown for M_SUM species
+  "#fff4e3", "#fee0b6", "#fdd697", "#fdb863", "#f29842",
+  "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
+)
+
+# Step 6: Assign colors
+livestock_df <- livestock_df %>%
+  mutate(color = case_when(
+    value >= 1  & value <= 30 ~ abandon_palette[value],
+    TRUE ~ "#d3d3d3"
+  ))
+
+# Step 7: Map
+livestock_map <- ggplot() +
+  geom_tile(data = livestock_df, aes(x = x, y = y, fill = color)) +
+  scale_fill_identity() +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2) +
+  coord_sf(xlim = c(2635973, 6525973), ylim = c(1448659, 5415659), expand = FALSE) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )  +
+  labs(
+    title = "Wildlife expansion and low livestock density"
+  ) +
+  theme(
+    plot.title = element_text(
+      size = 18,        # font size (increase/decrease as needed)
+      face = "bold",    # makes it bold
+      hjust = 0.5       # centers the title
+    ))
+
+ggsave(
+  file.path(output_dir, 'livestock_wolf_bear_species_map_1.png'),
+  plot = livestock_map,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+# LEGEND SECTION ------------------------------------------------------------
+
+# Build legend df
+legend_df <- expand.grid(
+  base_level = 1:10,
+  expansion = c("No species gained", "P_SUM gained", "M_SUM gained")
+)
+
+# Recode and assign palette
+legend_palette <- abandon_palette
+legend_df <- legend_df %>%
+  mutate(
+    expansion = recode(
+      expansion,
+      "No species gained" = "Species absent",
+      "P_SUM gained" = "Species gained (proba > 0.5)",
+      "M_SUM gained" = "No new species"
+    ),
+    color = case_when(
+      expansion == "Species absent" ~ legend_palette[base_level],
+      expansion == "Species gained (proba > 0.5)" ~ legend_palette[base_level + 10],
+      expansion == "No new species" ~ legend_palette[base_level + 20]
+    )
+  )
+
+livestock_legend_limits <- round(livestock_breaks)
+
+# Plot legend
+livestock_legend <- ggplot(legend_df, aes(x = base_level, y = expansion, fill = color)) +
+  geom_tile() +
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(0.5, 10.5, 1),
+    labels = livestock_legend_limits,
+    position = 'top'
+  ) +
+  labs(
+    x = "Livestock (count/km2)",
+    y = "Species expansion status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(size = 14, angle = 0, vjust = 1.6, hjust = 1, margin = margin(r = -80)),
+    axis.text = element_text(size = 11),
+    axis.text.x = element_text(size = 11, angle = 90),
+    axis.text.x.top = element_text(size = 11, hjust = 0),
+    axis.title.x.top = element_text(size = 14, margin = margin(b = 20)),
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 10, 10, 100)
+  ) +
+  coord_fixed(ratio = 0.5)
+
+# Step 5: Display
+plot(livestock_legend)
+
+ggsave(
+  file.path(output_dir, 'livestock_wolf_bear_species_legend_1.png'),
+  plot = livestock_legend,
+  width = 24, height = 10, units = 'cm', dpi = 300
+)
+
+# Save combined
+final_plot <- plot_grid(livestock_map, livestock_legend, ncol = 2)
+
+ggsave(
+  file.path(output_dir, "livestock_wolf_bear_species_map_with_legend_3levels_purple_2.png"),
+  plot = final_plot,
+  width = 40, height = 25, units = "cm", dpi = 300
+)
 
 ```
-## Step n
+
+## IV. Vizualising overlap of the four benefits (top 80% of each)
+
+# 1. Determining when benefits overlap
+
+Get the top 80% of each benefits
 
 ```{r}
 
+# Function to compute binary raster for top (80%) bins x binary mask, preserving NA
+extract_top80_bins <- function(classified_raster, binary_mask, top_bins = c(3, 4, 5, 6, 7, 8, 9, 10)) {
+  result <- ifel(is.na(classified_raster) | is.na(binary_mask), NA,
+                 ifel(classified_raster %in% top_bins & binary_mask == 1, 1, 0))
+  return(result)
+}
 
+# Apply function to each pair
+carbon_top80_stack <- extract_top80_bins(pot_carbon_classified, aban_masked)
+cv_top80_stack  <- extract_top80_bins(cv_classified, aban_masked)
+wtt_top80_stack <- extract_top80_bins(WTT_classified, P_SUM_threshold_masked)
+livestock_top80_stack <- extract_top80_bins(livestock_classified_10, P_CN_UA_threshold_masked)
 
+# Stack for inspection or export
+top80_stacks <- c(carbon_top80_stack, cv_top80_stack, wtt_top80_stack, livestock_top80_stack)
+
+par(mfrow = c(2,2))
+plot(carbon_top80_stack)
+plot(cv_top80_stack)
+plot(wtt_top80_stack)
+plot(livestock_top80_stack)
+
+# Export to the correct output directory
+writeRaster(top80_stacks, filename = file.path(output_dir, "rewilding_opportunity_top40_250707.tif"), overwrite = TRUE)
+
+# NPP Top 80%
+png(file.path(output_dir, "npp_top80_map.png"), width = 800, height = 800, res = 150)
+plot(npp_top40_stack, main = "Top 80% NPP × Abandonment")
+dev.off()
+
+# CV Top 80%
+png(file.path(output_dir, "cv_top80_map.png"), width = 800, height = 800, res = 150)
+plot(cv_top80_stack, main = "Top 80% CV × Abandonment")
+dev.off()
+
+# WTT Top 80%
+png(file.path(output_dir, "wtt_top80_map.png"), width = 800, height = 800, res = 150)
+plot(wtt_top80_stack, main = "Top 80% WTT × Expansion")
+dev.off()
+
+# Livestock Top 80%
+png(file.path(output_dir, "livestock_top80_map.png"), width = 800, height = 800, res = 150)
+plot(livestock_top40_stack, main = "Top 80% Livestock × Expansion")
+dev.off()
 
 ```
-## Step n
+
+Determining when the four overlap and when they never overlap
 
 ```{r}
 
+# Load the four binary top 80% raster layers
+carbon80  <- carbon_top80_stack
+cv80      <- cv_top80_stack
+wtt80     <- wtt_top80_stack
+livestock80 <- livestock_top80_stack
 
+### When they never overlapp
+
+# Function to isolate exclusive presence (1) while others are 0
+only_one <- function(target, others) {
+  result <- ifelse(target == 1 & rowSums(others) == 0, 1, 0)
+  result[is.na(target) | apply(is.na(others), 1, any)] <- NA
+  return(result)
+}
+
+# Convert to matrices for row-wise operations
+# Combine other layers excluding each target
+others_cv80 <- c(carbon80, wtt80, livestock80)
+others_carbon80 <- c(cv80, wtt80, livestock80)
+others_wtt80 <- c(carbon80, cv80, livestock80)
+others_livestock80 <- c(carbon80, cv40, wtt80)
+
+# Compute exclusive layers
+carbon_only80 <- only_one(values(carbon80), values(others_carbon80))
+cv_only80 <- only_one(values(cv80), values(others_cv80))
+wtt_only80 <- only_one(values(wtt80), values(others_wtt80))
+livestock_only80 <- only_one(values(livestock80), values(others_livestock80))
+
+# Assign back to raster objects
+carbon_only_r80 <- setValues(carbon80, carbon_only80)
+cv_only_r80 <- setValues(cv80, cv_only80)
+wtt_only_r80 <- setValues(wtt80, wtt_only80)
+livestock_only_r80 <- setValues(livestock80, livestock_only80)
+
+# Combine into a stack
+exclusive_stack80 <- c(carbon_only_r80, cv_only_r80, wtt_only_r80, livestock_only_r80)
+names(exclusive_stack80) <- c("carbon_only80", "cv_only80", "wtt_only80", "livestock_only80")
+
+# Plot or export
+plot(exclusive_stack80)
+writeRaster(exclusive_stack80, filename = file.path(output_dir, "exclusive_overlap_stack80.tif"), overwrite = TRUE)
+
+```
+
+Determining when two benefits overlap
+
+```{r}
+
+### When two layers overlap
+
+# Ensure NA-safe pairwise overlap
+binary_overlap <- function(x, y, others) {
+  # Condition: x == 1 & y == 1 & all others == 0
+  overlap <- (x == 1) & (y == 1)
+  exclude <- Reduce("+", lapply(others, function(z) z == 1))
+  result <- ifel(overlap & (exclude == 0), 1, 0)
+  result[is.na(x) | is.na(y) | Reduce("|", lapply(others, is.na))] <- NA
+  return(result)
+}
+
+# Compute 2-way overlaps
+carbon_cv80        <- binary_overlap(carbon80, cv80, list(wtt80, livestock80))
+carbon_wtt80      <- binary_overlap(carbon80, wtt80, list(cv80, livestock80))
+carbon_livestock80 <- binary_overlap(carbon80, livestock80, list(cv80, wtt80))
+cv_wtt80        <- binary_overlap(cv80, wtt80, list(carbon80, livestock80))
+cv_livestock80  <- binary_overlap(cv80, livestock80, list(carbon80, wtt80))
+wtt_livestock80 <- binary_overlap(wtt80, livestock80, list(carbon80, cv80))
+
+# Stack results
+overlap_stack80 <- c(carbon_cv80, carbon_wtt80, carbon_livestock80, cv_wtt80, cv_livestock80, wtt_livestock80)
+names(overlap_stack80) <- c("carbon_cv80", "carbon_wtt80", "carbon_livestock80", "cv_wtt80", "cv_livestock80", "wtt_livestock80")
+
+# Plot or save
+plot(overlap_stack80)
+names(overlap_stack80)
+
+# Step 1: Assign unique values
+carbon_cv_map80 <- ifel(overlap_stack80$carbon_cv80 == 1, 1, NA)
+carbon_wtt_map80 <- ifel(overlap_stack80$carbon_wtt80 == 1, 2, NA)
+carbon_livestock_map80 <- ifel(overlap_stack80$carbon_livestock80 == 1, 3, NA)
+cv_wtt_map80 <- ifel(overlap_stack80$cv_wtt80 == 1, 4, NA)
+cv_livestock_map80 <- ifel(overlap_stack80$cv_livestock80 == 1, 5, NA)
+wtt_livestock_map80 <- ifel(overlap_stack80$wtt_livestock80 == 1, 6, NA)
+
+# Add background category = 0 where all are NA
+all_na <- is.na(carbon_cv_map80) & is.na(carbon_wtt_map80) & is.na(carbon_livestock_map80) &
+          is.na(cv_wtt_map80) & is.na(cv_livestock_map80) & is.na(wtt_livestock_map80)
+
+background_map <- ifel(all_na, 0, NA)  # gray background
+
+# Step 2: Combine layers (priority-based, highest takes precedence)
+combined_map <- merge(
+  background_map,
+  carbon_cv_map80, carbon_wtt_map80, carbon_livestock_map80, cv_wtt_map80, cv_livestock_map80, wtt_livestock_map80  
+)
+
+combined_map_masked <- mask(combined_map, inland_raster)
+
+# Step 3: Convert to dataframe for ggplot
+map_df <- as.data.frame(combined_map_masked, xy = TRUE)
+colnames(map_df)[3] <- "category"
+
+# Remove NA rows only now
+map_df <- map_df[!is.na(map_df$category), ]
+
+# Step 4: Define custom color palette and labels
+category_colors <- c(
+  "0" = "#ECECEC",  # gray background
+  "1" = "#D47000",
+  "2" = "#00FFE4",
+  "3" = "#6C00FF",
+  "4" = "#2AFF00",
+  "5" = "#0059FF",
+  "6" = "#EC01FF"
+)
+
+category_labels <- c(
+  "0" = "No opportunity",
+  "1" = "High mitigation & adaptation",
+  "2" = "High mitigation & social benefit",
+  "3" = "High mitigation & low conflict",
+  "4" = "High adaptation & social benefit",
+  "5" = "High adaptation & low conflict",
+  "6" = "High social benefit & low conflict"
+)
+
+map_df_opp_two_80_carbon <- map_df
+
+# Step 5: Plot with ggplot + borders and coastlines
+map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = category_colors,
+    labels = category_labels,
+    name = "Two rewilding opportunities"
+  ) +
+  # Add country borders and coastlines
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),  # adapte les limites si nécessaire
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal()
+
+```
+
+Determining when three benefits overlap
+
+```{r}
+
+### When three layers overlap
+
+# Function to compute 3-way overlap while the 4th is 0
+three_way_overlap <- function(a, b, c, not_d) {
+  combo <- (a == 1) & (b == 1) & (c == 1) & (not_d == 0)
+  combo[is.na(a) | is.na(b) | is.na(c) | is.na(not_d)] <- NA
+  return(combo)
+}
+
+# Compute all 4 possible 3-way overlaps (excluding one each time)
+overlap_carbon_cv_wtt80     <- three_way_overlap(carbon80, cv80, wtt80, livestock80)
+overlap_carbon_cv_livest80 <- three_way_overlap(carbon80, cv80, livestock80, wtt80)
+overlap_carbon_wtt_livest80 <- three_way_overlap(carbon80, wtt80, livestock80, cv80)
+overlap_cv_wtt_livest80  <- three_way_overlap(cv80, wtt80, livestock80, carbon80)
+
+# Combine into a stack
+overlap_3_stack80 <- c(
+  overlap_carbon_cv_wtt80,
+  overlap_carbon_cv_livest80,
+  overlap_carbon_wtt_livest80,
+  overlap_cv_wtt_livest80
+)
+names(overlap_3_stack80) <- c("carbon_cv_wtt80", "carbon_cv_livest80", "carbon_wtt_livest80", "cv_wtt_livest80")
+
+plot(overlap_3_stack80)
+names(overlap_3_stack80)
+
+# Step 1: Assign unique values
+carbon_cv_wtt_map80 <- ifel(overlap_3_stack80$carbon_cv_wtt80 == 1, 1, NA)
+carbon_cv_livest_map80 <- ifel(overlap_3_stack80$carbon_cv_livest80 == 1, 2, NA)
+carbon_wtt_livest_map80 <- ifel(overlap_3_stack80$carbon_wtt_livest80 == 1, 3, NA)
+cv_wtt_livest_map80 <- ifel(overlap_3_stack80$cv_wtt_livest80 == 1, 4, NA)
+
+# Add background category = 0 where all are NA
+all_na <- is.na(carbon_cv_wtt_map80) & is.na(carbon_cv_livest_map80) & is.na(carbon_wtt_livest_map80) & is.na(cv_wtt_livest_map80)
+
+background_map <- ifel(all_na, 0, NA)  # gray background
+
+# Step 2: Combine layers (priority-based, highest takes precedence)
+combined_map <- merge(
+  background_map,
+  carbon_cv_wtt_map80, carbon_cv_livest_map80, carbon_wtt_livest_map80, cv_wtt_livest_map80
+)
+
+combined_map_masked <- mask(combined_map, inland_raster)
+
+# Step 3: Convert to dataframe for ggplot
+map_df <- as.data.frame(combined_map_masked, xy = TRUE)
+colnames(map_df)[3] <- "category"
+
+# Remove NA rows only now
+map_df <- map_df[!is.na(map_df$category), ]
+
+# Step 4: Define custom color palette and labels
+category_colors <- c(
+  "0" = "#ECECEC",  # gray background
+  "1" = "#000FFF",
+  "2" = "#00C112", 
+  "3" = "#BA01FF",
+  "4" = "#01FFEC"
+)
+
+category_labels <- c(
+  "0" = "No opportunity",
+  "1" = "High mitigation, high adaptation & high social benefit",
+  "2" = "High mitigation, high adaptation & low conflict",
+  "3" = "High mitigation, high social benefit & low conflict",
+  "4" = "High adaptation, high social benefit & low conflict"
+)
+
+map_df_opp_three_40_carbon <- map_df
+map_df_opp_three_80_carbon <- map_df_opp_three_40_carbon 
+
+# Step 5: Plot with ggplot + borders and coastlines
+map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = category_colors,
+    labels = category_labels,
+    name = "Three rewilding opportunities"
+  ) +
+  # Add country borders and coastlines
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),  # adapte les limites si nécessaire
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal()
+
+```
+
+Determining when the four benefits overlap
+
+```{r}
+
+### When four layers overlap
+combined_top80_all1 <- ifel(
+  is.na(carbon80) | is.na(cv80) |
+  is.na(wtt80) | is.na(livestock80),
+  NA,
+  ifel(carbon80 == 1 & cv80 == 1 &
+       wtt80 == 1 & livestock80 == 1,
+       1, 0)
+)
+
+plot(combined_top80_all1)
+names(combined_top80_all1)
+
+combined_top80_all1_masked <- mask(combined_top80_all1, inland_raster)
+
+# Step 1: Convert to dataframe
+map_df <- as.data.frame(combined_top80_all1_masked, xy = TRUE)
+colnames(map_df)[3] <- "category"
+
+# Remove NA rows only
+map_df <- map_df[!is.na(map_df$category), ]
+
+map_df <- map_df %>%
+  filter(x >= 2635973, x <= 6525973, y >= 1448659, y <= 5415659)
+
+# Step 2: Define color palette and labels
+category_colors <- c(
+  "0" = "#ECECEC",  # gray background
+  "1" = "#01FF05"   # you can pick another color
+)
+
+category_labels <- c(
+  "0" = "No opportunity",
+  "1" = "High mitigation, high adaptation &\n high social benefit & low conflict"
+)
+
+map_df_opp_four_80_carbon <- map_df
+
+# Step 3: Plot
+map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = category_colors,
+    labels = category_labels,
+    name = "Four rewilding opportunities"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal()
+
+```
+
+Map the number of overlaps
+
+```{r}
+
+# Step 1: Keep 0 when 0, retain all values
+map_df_opp_single_80_carbon$category <- ifelse(map_df_opp_single_80_carbon$category != 0, 1, 0)
+map_df_opp_two_80_carbon$category    <- ifelse(map_df_opp_two_80_carbon$category != 0, 2, 0)
+map_df_opp_three_80_carbon$category  <- ifelse(map_df_opp_three_80_carbon$category != 0, 3, 0)
+map_df_opp_four_80_carbon$category   <- ifelse(map_df_opp_four_80_carbon$category != 0, 4, 0)
+
+# Step 2: Keep only rows where category != 0 (to avoid double-counting), retain ocean as NA
+df1 <- map_df_opp_single_80_carbon[map_df_opp_single_80_carbon$category != 0, ]
+df2 <- map_df_opp_two_80_carbon[map_df_opp_two_80_carbon$category != 0, ]
+df3 <- map_df_opp_three_80_carbon[map_df_opp_three_80_carbon$category != 0, ]
+df4 <- map_df_opp_four_80_carbon[map_df_opp_four_80_carbon$category != 0, ]
+
+# Step 3: Merge priority-wise (4 → 3 → 2 → 1)
+map_df <- rbind(df1, df2, df3, df4)
+map_df <- map_df[order(map_df$x, map_df$y, -map_df$category), ]  # prioritize higher category
+map_df <- map_df[!duplicated(map_df[, c("x", "y")]), ]            # remove duplicates, keep highest
+
+# Step 4: Rebuild NA + 0 base from any of the original full maps
+base_template <- map_df_opp_single_80_carbon[, c("x", "y")]
+map_df_final <- merge(base_template, map_df, by = c("x", "y"), all.x = TRUE)
+
+# Step 5: Replace NA in category with 0 (only for land areas that had no opportunities)
+# Note: leave real NA (ocean) untouched
+map_df_final$category <- ifelse(
+  is.na(map_df_final$category) & !is.na(map_df_opp_single_40_carbon$category),
+  0,
+  map_df_final$category
+)
+
+# Step 6: Factor conversion for plotting
+map_df_final$category <- factor(map_df_final$category, levels = 0:4)
+
+# Step 4: Define custom color palette and labels
+category_colors <- c(
+  "0" = "#FFFFFF",  # white background
+  "1" = "#A9BF00",  
+  "2" = "#FCCA3F",  
+  "3" = "#FC3F3F",  
+  "4" = "#7363FF"   
+)
+
+category_labels <- c(
+  "0" = "No opportunity",
+  "1" = "Single opportunity",
+  "2" = "Two opportunities",
+  "3" = "Three opportunities",
+  "4" = "Four opportunities"
+)
+
+# Step 5: Plot base map
+map_opportunities <- ggplot(map_df_final, aes(x = x, y = y, fill = factor(category))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = category_colors,
+    labels = category_labels,
+    name = "Rewilding potential"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal()
 
 
 ```
+
+# 2. Determining benefits extent: distinguishing overlapping extent and exclusive extent 
+
+Climate change mitigation
+
+```{r}
+
+######## Carbon
+# Whole extent
+plot(carbon80)
+# Extent alone
+plot(exclusive_stack80$carbon_only_r80)
+
+# Step 1: Reclassify rasters into 0/1
+r_whole <- carbon80
+r_excl  <- exclusive_stack80$carbon_only_r80
+
+# Step 2: Combine with priority to exclusive
+# Start with whole extent
+r_combined <- ifel(r_whole == 1, 1, 0)  # 1 = whole
+# Overwrite with exclusive where present
+r_combined <- ifel(r_excl == 1, 2, r_combined)  # 2 = exclusive
+
+# Step 3: Convert to data frame for ggplot
+df_combined <- as.data.frame(r_combined, xy = TRUE)
+names(df_combined)[3] <- "category"
+df_combined$category <- factor(df_combined$category, levels = c(0, 1, 2))
+
+# Step 4: Define colors and labels
+combined_colors <- c(
+  "0" = "#FFFFFF",   # white
+  "1" = "#0090FF",   # light blue = whole extent
+  "2" = "#D10000"    # dark blue = exclusive
+)
+
+combined_labels <- c(
+  "1" = "Overlapping extent",
+  "2" = "Exclusive extent"
+)
+
+# Step 5: Plot
+map_combined_carbon <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = combined_colors,
+    breaks = c("1", "2"),    # show only meaningful classes
+    labels = combined_labels[c("1", "2")],
+    name = "CC mitigation opportunity"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Climate change mitigation opportunity (top 80%)")
+
+plot(map_combined_carbon)
+
+ggsave(
+  file.path(output_dir, 'opportunities80_mitigation_3.png'),
+  plot = map_combined_carbon,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
+Climate change adaptation
+
+```{r}
+
+# Whole extent
+plot(cv_top80_stack)
+# Extent alone
+plot(exclusive_stack80$cv_only80)
+
+# Step 1: Reclassify rasters into 0/1
+r_whole <- cv_top80_stack
+r_excl  <- exclusive_stack80$cv_only80
+
+# Step 2: Combine with priority to exclusive
+# Start with whole extent
+r_combined <- ifel(r_whole == 1, 1, 0)  # 1 = whole
+# Overwrite with exclusive where present
+r_combined <- ifel(r_excl == 1, 2, r_combined)  # 2 = exclusive
+
+# Step 3: Convert to data frame for ggplot
+df_combined <- as.data.frame(r_combined, xy = TRUE)
+names(df_combined)[3] <- "category"
+df_combined$category <- factor(df_combined$category, levels = c(0, 1, 2))
+
+# Step 4: Define colors and labels
+combined_colors <- c(
+  "0" = "#FFFFFF",   # white
+  "1" = "#0090FF",   # light blue = whole extent
+  "2" = "#D10000"    # dark blue = exclusive
+)
+
+combined_labels <- c(
+  "1" = "Overlapping extent",
+  "2" = "Exclusive extent"
+)
+
+# Step 5: Plot
+map_combined_cv <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = combined_colors,
+    breaks = c("1", "2"),    # show only meaningful classes
+    labels = combined_labels[c("1", "2")],
+    name = "CC adaptation opportunity"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Climate change adaptation opportunity (top 80%)")
+
+plot(map_combined_cv)
+
+ggsave(
+  file.path(output_dir, 'opportunities80_adaptation_3.png'),
+  plot = map_combined_cv,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+
+```
+
+Social benefits
+
+```{r}
+
+# Whole extent
+plot(wtt_top80_stack)
+# Extent alone
+plot(exclusive_stack80$wtt_only80)
+
+# Step 1: Reclassify rasters into 0/1
+r_whole <- wtt_top80_stack
+r_excl  <- exclusive_stack80$wtt_only80
+
+# Step 2: Combine with priority to exclusive
+# Start with whole extent
+r_combined <- ifel(r_whole == 1, 1, 0)  # 1 = whole
+# Overwrite with exclusive where present
+r_combined <- ifel(r_excl == 1, 2, r_combined)  # 2 = exclusive
+
+# Step 3: Convert to data frame for ggplot
+df_combined <- as.data.frame(r_combined, xy = TRUE)
+names(df_combined)[3] <- "category"
+df_combined$category <- factor(df_combined$category, levels = c(0, 1, 2))
+
+# Step 4: Define colors and labels
+combined_colors <- c(
+  "0" = "#FFFFFF",   # white
+  "1" = "#0090FF",   # light blue = whole extent
+  "2" = "#D10000"    # dark blue = exclusive
+)
+
+combined_labels <- c(
+  "1" = "Overlapping extent",
+  "2" = "Exclusive extent"
+)
+
+# Step 5: Plot
+map_combined_wtt <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = combined_colors,
+    breaks = c("1", "2"),    # show only meaningful classes
+    labels = combined_labels[c("1", "2")],
+    name = "Ecotourism opportunity"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Ecotourism opportunity (top 80%)")
+
+plot(map_combined_wtt)
+
+ggsave(
+  file.path(output_dir, 'opportunities80_wtt_2.png'),
+  plot = map_combined_wtt,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+
+```
+
+Sociale conflicts
+
+```{r}
+
+# Whole extent
+plot(livestock_top80_stack)
+# Extent alone
+plot(exclusive_stack80$livestock_only80)
+
+# Step 1: Reclassify rasters into 0/1
+r_whole <- livestock_top80_stack
+r_excl  <- exclusive_stack80$livestock_only80
+
+# Step 2: Combine with priority to exclusive
+# Start with whole extent
+r_combined <- ifel(r_whole == 1, 1, 0)  # 1 = whole
+# Overwrite with exclusive where present
+r_combined <- ifel(r_excl == 1, 2, r_combined)  # 2 = exclusive
+
+# Step 3: Convert to data frame for ggplot
+df_combined <- as.data.frame(r_combined, xy = TRUE)
+names(df_combined)[3] <- "category"
+df_combined$category <- factor(df_combined$category, levels = c(0, 1, 2))
+
+# Step 4: Define colors and labels
+combined_colors <- c(
+  "0" = "#FFFFFF",   # white
+  "1" = "#0090FF",   # light blue = whole extent
+  "2" = "#D10000"    # dark blue = exclusive
+)
+
+combined_labels <- c(
+  "1" = "Overlapping extent",
+  "2" = "Exclusive extent"
+)
+
+# Step 5: Plot
+map_combined_livestock <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = combined_colors,
+    breaks = c("1", "2"),    # show only meaningful classes
+    labels = combined_labels[c("1", "2")],
+    name = "Low conflict opportunity"
+  ) +
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(title = "Low livestock-wildlife conflict opportunity (top 80%)")
+
+plot(map_combined_livestock)
+
+ggsave(
+  file.path(output_dir, 'opportunities80_livestock_2.png'),
+  plot = map_combined_livestock,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
+```
+
