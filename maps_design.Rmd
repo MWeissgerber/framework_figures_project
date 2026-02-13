@@ -28,8 +28,6 @@ library(ggplot2)
 
 library(tidyterra)
 
-
-
 library(gridExtra)
 
 library(ggspatial)
@@ -130,6 +128,9 @@ plot(hanpp_aligned, main = "Inverted HANPP/NPP (scaled 0–1)")
 hanpp_aligned_threshold_8 <- classify(hanpp_aligned, matrix(c(-Inf, 0.8, 0, 0.8, Inf, 1), ncol = 3, byrow = TRUE))
 # Plot to check
 plot(hanpp_aligned_threshold_8, main = "Binary naturalness (≥0.8 = 1)")
+# Masked so only areas of interest are kept
+hanpp_masked <- mask(hanpp_aligned_threshold_8, inland_raster)
+plot(hanpp_masked)
 
 ```
 
@@ -160,6 +161,9 @@ aban_simple_proj <- project(aban_simple, ref_raster)
 plot(aban_simple_proj)
 aban_simple_aligned <- terra::resample(aban_simple_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
 plot(aban_simple_aligned)
+# Masked so only areas of interest are kept
+abandonment_masked <- mask(aban_simple_aligned, inland_raster)
+plot(abandonment_masked)
 
 ```
 
@@ -174,6 +178,9 @@ crs(pot_carbon) == crs(ref_raster)             # Coordinate system
 res(pot_carbon) == res(ref_raster)             # Resolution
 ext(pot_carbon) == ext(ref_raster)             # Extent
 pot_carbon_proj <- project(pot_carbon, ref_raster)
+# Masked so only areas of interest are kept
+pot_carbon_masked <- mask(pot_carbon_proj, inland_raster)
+plot(pot_carbon_masked)
 
 ```
 
@@ -207,6 +214,9 @@ plot(meff_2022_proj)
 # Reclassify: values >= 80 → 1, else → 0
 meff_2022_binary_T8 <- ifel(meff_2022_proj >= 80, 1, 0)
 plot(meff_2022_binary_T8)
+# Masked so only areas of interest are kept
+high_meff_masked <- mask(meff_2022_binary_T8, inland_raster)
+plot(high_meff_masked)
 
 ```
 
@@ -227,11 +237,9 @@ cv_proj <- project(cv, ref_raster)
 plot(cv_proj)
 cv_aligned <- terra::resample(cv_proj, ref_raster, method = "near")  # use "bilinear" for continuous 
 plot(cv_aligned)
-
-# Abandonment
-# Cf "climate change mitigation"
-
-
+# Masked so only areas of interest are kept
+cv_masked <- mask(cv_aligned, inland_raster)
+plot(cv_masked)
 
 ```
 
@@ -1139,21 +1147,22 @@ plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
 
 ```{r}
 
-writeRaster(npp_masked, filename = file.path(output_dir, "layers_maps_npp_masked_250716.tif"), overwrite = TRUE)
+output_dir = 
 
-writeRaster(aban_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked_250716.tif"), overwrite = TRUE)
+writeRaster(hanpp_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
 
-writeRaster(hanpp_T8_masked, filename = file.path(output_dir, "layers_maps_hanpp_T8_masked_250716.tif"), overwrite = TRUE)
+writeRaster(abandonment_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
 
-writeRaster(hanpp_T5_masked, filename = file.path(output_dir, "layers_maps_hanpp_T5_masked_250716.tif"), overwrite = TRUE)
+writeRaster(pot_carbon_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
+
+writeRaster(high_meff_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
 
 writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked_250716.tif"), overwrite = TRUE)
 
 writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked_250716.tif"), overwrite = TRUE)
 
-writeRaster(meff_T8_masked, filename = file.path(output_dir, "layers_maps_meff_T8_masked_250716.tif"), overwrite = TRUE)
 
-writeRaster(meff_T5_masked, filename = file.path(output_dir, "layers_maps_meff_T5_masked_250716.tif"), overwrite = TRUE)
+
 
 writeRaster(WTT_average_masked, filename = file.path(output_dir, "layers_maps_WTT_average_masked_250716.tif"), overwrite = TRUE)
 
