@@ -9,13 +9,26 @@ output: html_document
 
 ```{r}
 
+if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
+renv::activate()
+renv::restore()
+
+install.packages(c(
+  "terra", "ggplot2", "tidyterra", "sf", "gridExtra", "ggspatial",
+  "cowplot", "ggtext", "xfun", "patchwork", "dplyr", "grid"
+))
+
+install.packages("terra")
 library(terra)
+
+install.packages("sf")
+library(sf)
 
 library(ggplot2)
 
 library(tidyterra)
 
-library(sf)
+
 
 library(gridExtra)
 
@@ -39,25 +52,28 @@ library(grid)
 
 ```{r}
 
-# Import the raster of human population and of Europe's border to have the reference raster regarding crs, ext and res (ie the population raster is the reference one)
+# We use a raster of human population density, it can be downloaded here https://ec.europa.eu/eurostat/web/gisco/geodata/population-distribution/population-grids
+# We use it as a reference raster for resolution, crs, and extent
 
-# Import population raster nut ditinguisg inland (should be 0) and oceans (should be NA)
-
+# Import population raster not distinguishing inland (should be 0) and oceans (should be NA)
 # Step 1: Load the population raster and coastline shapefile
 raster_1km_human_population_path <- "S:/Magali_Weissgerber/human_population_scratch/JRC_1K_POP_2018.tif" # Read the 1km resolution raster
 raster_1km_human_population <- rast(raster_1km_human_population_path)
 plot(raster_1km_human_population)
 
-# Import Europe's borders
+# It is not distinguishing different type of absence of popupation: inland (should be 0) and oceans (should be NA)
+# So we are using a file with the coastlines to make this disctinction
+
+# Step 2: Load coastline shapefile
+# Import Europe's borders (download here #### this one we can put online ####)
 inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
 plot(inland_shapefile)
 
+# Step 3: check the objects
 # Check the type of the raster object
 class(raster_1km_human_population)
-
 # Check if the raster object is valid
 print(raster_1km_human_population)
-
 # Ensure the CRS is consistent
 crs(raster_1km_human_population) <- "EPSG:3035"
 # Check and reproject the shapefile to match the CRS of the raster
@@ -65,12 +81,12 @@ if (crs(inland_shapefile) != crs(raster_1km_human_population)) {
   inland_shapefile <- st_transform(inland_shapefile, crs(raster_1km_human_population))
 }
 
-# Step 2: Create a mask from the coastline shapefile
+# Step 4: Create a mask from the coastline shapefile
 # Rasterize the coastline shapefile to create a mask
 inland_raster <- rasterize(vect(inland_shapefile), raster_1km_human_population, field = 1, background = NA)
 plot(inland_raster)
 
-# Step 3: Preprocess the population raster
+# Step 5: Preprocess the population raster
 # Replace inland NA values with 0
 population_preprocessed <- raster_1km_human_population
 values(population_preprocessed)[is.na(values(population_preprocessed)) & !is.na(values(inland_raster))] <- 0
@@ -78,10 +94,8 @@ plot(population_preprocessed)
 
 #Rename
 raster_1km_human_population <- population_preprocessed
-
-#Export
-#output_population_preprocessed <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/population_masked_ocean_240723.tif")
-#writeRaster(raster_1km_human_population, output_population_preprocessed, overwrite=TRUE)
+#Define the reference raster
+ref_raster <- raster_1km_human_population
 
 ```
 
@@ -89,7 +103,7 @@ raster_1km_human_population <- population_preprocessed
 
 # 1 Climate change mitigation
 
-Current = low use intensity
+Current = disturbance regime highly natural
 
 ```{r}
 
@@ -97,7 +111,6 @@ Current = low use intensity
 
 # Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
 hanpp_path <- "I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
-hanpp_path <- "I:/biocon/Projects_RESTORED_20250711_091725/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
 # Load the raster
 hanpp_raster <- rast(hanpp_path)
 # Plot to check
@@ -111,9 +124,8 @@ ext(hanpp_inverted) == ext(ref_raster)             # Extent
 hanpp_proj <- project(hanpp_inverted, ref_raster)
 plot(hanpp_proj)
 hanpp_aligned <- terra::resample(hanpp_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
-plot(hanpp_aligned)
 # Plot to check result
-plot(hanpp_aligned, main = "Inverted HANPP (scaled 0–1)")
+plot(hanpp_aligned, main = "Inverted HANPP/NPP (scaled 0–1)")
 # Potential expansion with a combined probability of at least 0.8 (threshold)
 hanpp_aligned_threshold_8 <- classify(hanpp_aligned, matrix(c(-Inf, 0.8, 0, 0.8, Inf, 1), ncol = 3, byrow = TRUE))
 # Plot to check
@@ -155,16 +167,13 @@ Benefits = potential carbons stock
 
 ```{r}
 
-# Potential carbon (Walker 2022)
+# Potential carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
 
 pot_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Pot_AGB_BGB_SOC_MgCha_500m.tif')
 crs(pot_carbon) == crs(ref_raster)             # Coordinate system
 res(pot_carbon) == res(ref_raster)             # Resolution
 ext(pot_carbon) == ext(ref_raster)             # Extent
 pot_carbon_proj <- project(pot_carbon, ref_raster)
-crs(pot_carbon_proj) == crs(ref_raster)             # Coordinate system
-res(pot_carbon_proj) == res(ref_raster)             # Resolution
-ext(pot_carbon_proj) == ext(ref_raster)             # Extent
 
 ```
 
@@ -179,7 +188,7 @@ Current = high effectivement mesh size
 # Load the file
 # Define import directory
 # Define the directory path
-directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\WildE_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
+directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\2025_10_WildE_fragmentation_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
 # List files for 2022 with .tif or .tiff extension
 meff_2022_file <- list.files(
   path = directory_anth_meff,
