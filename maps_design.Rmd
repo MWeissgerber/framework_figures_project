@@ -24,7 +24,11 @@ library(terra)
 install.packages("sf")
 library(sf)
 
+install.packages("ggplot2")
 library(ggplot2)
+
+install.packages("data.table")
+library(data.table)
 
 library(tidyterra)
 
@@ -266,7 +270,7 @@ Import and check data; change to binary
 
 ```{r}
 
-SPECIES_OCC_initial_fishnet <-  st_read("S:/Magali_Weissgerber/Species_dist_occ_scratch/SP_OCCU_190207.shp")
+SPECIES_OCC_initial_fishnet <-  st_read("S:Magali_Weissgerber/Species_dist_occ_scratch/SP_OCC_HIST_2019report/SP_OCCU_190207.shp")
 
 head(SPECIES_OCC_initial_fishnet)
 names(SPECIES_OCC_initial_fishnet)
@@ -291,7 +295,7 @@ ggplot(SPECIES_OCC_binary_fishnet) +
 Rasterize, create distance raster and calculate probability of expansion
 
 Calculate probability of colonization (form K/e^-xdistance) (when distance = 0 it means the species is already there so probability is also 0). 
-Initially we used 1/exp((log(2)/50) distance) so to have 50% of probability of comeback at 50km. But based on Canis lupus dispersal values we apply rather 1/exp((log(2)/60) distance) (as the cells of the mammals ditribution are 10x10km the probability max is 0.89)
+Initially we used 1/exp((log(2)/50) distance) so to have 50% of probability of comeback at 50km. But based on Canis lupus dispersal values we apply rather 1/exp((log(2)/60) distance) (as the cells of the mammals distribution are 10x10km the probability max is 0.89)
 
 ```{r}
 
@@ -322,7 +326,11 @@ print(res(raster_10km_wildlife_occupancy_stack))
 print(res(raster_1km_human_population))
 
 # Resample the 10km raster to 1km resolution using nearest neighbor method
-raster_1km_wildlife_occupancy_stack <- resample(raster_10km_wildlife_occupancy_stack, raster_1km_human_population, method = "ngb")
+raster_1km_wildlife_occupancy_stack <- resample(
+  raster_10km_wildlife_occupancy_stack,
+  raster_1km_human_population,
+  method = "near"
+)
 
 # Check the resampled raster resolution
 print(res(raster_1km_wildlife_occupancy_stack))
@@ -334,13 +342,14 @@ plot(raster_1km_wildlife_occupancy_stack)
 raster_1km_wildlife_occupancy_stack$M_sum <- app(raster_1km_wildlife_occupancy_stack, sum)
 plot(raster_1km_wildlife_occupancy_stack)
 
-#Export
-#output_file_occupancy <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_occupancy_250106.tif")
-#writeRaster(raster_1km_wildlife_occupancy_stack, output_file_occupancy, overwrite=TRUE)
+# let's produce the distance raster for each species (depending on processing power it can take multiple hours per species to process)
 
-# let's produce the distance raster for each species (it can take 7h per species to process)
+# 1. Set output directory here
 
-# 1. Create list of species rasters
+output_directory <- "PATH/TO/YOUR/OUTPUT/FOLDER" 
+output_directory <- "S:/Magali_Weissgerber/Species_dist_occ_scratch/species_distance_260213"
+
+# 2. Create list of species rasters
 
 species_list <- list(
   CANLUP = raster_1km_wildlife_occupancy_stack$M_CANLUP,
@@ -353,67 +362,69 @@ species_list <- list(
   CAPPYR = raster_1km_wildlife_occupancy_stack$M_CAPPYR
 )
 
-# 2. Function to process species (no export)
+# 3. Processing function
 
-process_species <- function(r, species_name) {
-  message("Processing species: ", species_name)
+process_and_export_species <- function(r, species_name, output_dir) {
 
-  # Step 1: Clean raster (replace NaN with NA)
-  r_clean <- classify(r, matrix(c(NaN, NA), ncol = 2, byrow = TRUE))
-  r_clean <- mask(r_clean, r_clean)
+  tryCatch({
 
-  # Step 2: Check unique values
-  message("Unique values in cleaned raster:")
-  print(unique(values(r_clean)))
+    message("=======================================")
+    message("Processing species: ", species_name)
 
-  # Step 3: Extract presence cells (value = 1)
-  pts <- as.points(r_clean, values = TRUE, na.rm = TRUE)
-  pts <- pts[pts[[1]] == 1, ]
+    # Step 1: Clean raster
+    r_clean <- classify(r, matrix(c(NaN, NA), ncol = 2, byrow = TRUE))
+    r_clean <- mask(r_clean, r_clean)
 
-  # Step 4: Compute distance raster (km)
-  dist_r <- distance(r_clean, pts, unit = "km")
+    # Step 2: Extract presence cells
+    pts <- as.points(r_clean, values = TRUE, na.rm = TRUE)
+    pts <- pts[pts[[1]] == 1, ]
 
-  # Optional plot
-  plot(dist_r, main = paste0("Distance Raster: ", species_name))
+    if (nrow(pts) == 0) {
+      stop("No presence cells found.")
+    }
 
-  # Return list of outputs
-  return(list(
-    cleaned_raster = r_clean,
-    points = pts,
-    distance_raster = dist_r
-  ))
+    # Step 3: Compute distance raster
+    dist_r <- distance(r_clean, pts, unit = "km")
+
+    # Step 4: Export
+    output_file <- file.path(
+      output_dir,
+      paste0("dist_", species_name, ".tif")
+    )
+
+    writeRaster(dist_r, output_file, overwrite = TRUE)
+
+    message("Finished and exported: ", output_file)
+
+    return(TRUE)
+
+  }, error = function(e) {
+
+    message("ERROR in species ", species_name, ": ", e$message)
+    return(FALSE)
+
+  })
 }
 
-# 3. Function to export a processed species output
+# 4. Loop over all species
 
-export_species <- function(distance_raster, species_name, output_dir) {
+results_status <- list()
 
-  # Build filename with date
-  output_file <- file.path(
-    output_dir,
-    paste0("dist_", species_name, "_", format(Sys.Date(), "%y%m%d"), ".tif")
+for (sp in names(species_list)) {
+
+  results_status[[sp]] <- process_and_export_species(
+    r = species_list[[sp]],
+    species_name = sp,
+    output_dir = output_directory
   )
 
-  writeRaster(distance_raster, output_file, overwrite = TRUE)
-  message("Exported: ", output_file)
 }
 
-# 4. Apply processing to all species (no export happens here)
+# 5. Summary of processing
 
-processed_results <- mapply(
-  FUN  = process_species,
-  r    = species_list,
-  species_name = names(species_list),
-  SIMPLIFY = FALSE
-)
-
-# 5. Export only when you choose
-
-output_directory <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding"
-
-# Example: Export LYNPAR and CAPIBE
-export_species(processed_results$LYNPAR$distance_raster, "LYNPAR", output_directory)
-export_species(processed_results$CAPIBE$distance_raster, "CAPIBE", output_directory)
+message("=======================================")
+message("Processing summary:")
+print(results_status)
 
 # Next import 
 
