@@ -31,29 +31,13 @@ library(ravetools)
 
 
 
-install.packages("imager") #not for the convolve_image
-library(imager)
-remove.packages("imager")
-
-install.packages("fftw") #not for the convolve_image
-library(fftw)
-remove.packages("fftw")
-
-install.packages("fftwtools")
-library(fftwtools)
-remove.packages("fftwtools")
-
-install.packages("abind")
-library(abind)
-
-
-
-
-
-
-
 install.packages('dplyr') # Provides functions for common data manipulation tasks such as filtering, selecting, and summarizing data.
 library(dplyr)
+
+install.packages("xfun") # Provides supporting utility functions commonly used in R Markdown workflows.
+library(xfun)
+
+# For plotting
 
 install.packages("gridExtra") # Used to arrange multiple plots or graphical objects in a single layout.
 library(gridExtra)
@@ -70,9 +54,6 @@ library(cowplot)
 install.packages("ggtext") # Enables markdown or HTML formatting in ggplot2 plot text elements.
 library(ggtext)
 
-install.packages("xfun") # Provides supporting utility functions commonly used in R Markdown workflows.
-library(xfun)
-
 install.packages("patchwork") # Provides tools to combine multiple ggplot2 plots into a single figure layout.
 library(patchwork)
 
@@ -81,7 +62,11 @@ library(grid)
 
 ```
 
-## Prepare a reference raster and a mask with Europe's borders
+## Prepare helpful necessary layers
+- A reference raster
+- A mask with Europe's borders
+- Preprocessed (masked) human population density raster
+- Europe borders and coastlines
 
 ```{r}
 
@@ -129,6 +114,10 @@ plot(population_preprocessed)
 raster_1km_human_population <- population_preprocessed
 #Define the reference raster
 ref_raster <- raster_1km_human_population
+
+#Prepare also country borders and coastlines for mapping
+country_borders <- st_read("I:/biocon/Projects/RewildingMAP/DataSources/ReferenceData/ref-countries-2016-01m/CNTR_BN_01M_2016_3035_INLAND/CNTR_BN_01M_2016_3035_INLAND.shp")
+coastlines <- st_read("I:/biocon/Projects/RewildingMAP/DataSources/Europe_coastline_shapefile/Europe_coastline.shp")
 
 ```
 
@@ -602,8 +591,7 @@ Calculate the number of people travelling based on the WTT
 For large carnivores
 
 ```{r}
-find("convolve_image")
-getAnywhere(convolve_image)
+
 # Step 1: create the kernel matrix
 
 # Step 1.1: Define matrix dimensions and create the distance matrix
@@ -748,11 +736,13 @@ print("Top-left corner of the matrix:")
 print(kernel_matrix_LH[1:10, 1:10])  # Displaying the top-left 10x10 cells
 
 #Step 2: create the population matrix
+
 #Step 2.1: create an identifcal raster and print basic information about the raster
 raster_1km_human_population_threshold_3 <- raster_1km_human_population_threshold
 print(raster_1km_human_population_threshold_3)
 # Summary of the raster to check the range of values
 summary(raster_1km_human_population_threshold_3)
+
 #Step 2.2: Check the number of non-zero and NA values
 num_zeros <- sum(values(raster_1km_human_population_threshold_3) == 0, na.rm = TRUE)
 num_nas <- sum(is.na(values(raster_1km_human_population_threshold_3)))
@@ -760,15 +750,18 @@ num_non_zeros <- sum(values(raster_1km_human_population_threshold_3) > 0, na.rm 
 cat("Number of zero values:", num_zeros, "\n")
 cat("Number of NA values:", num_nas, "\n")
 cat("Number of non-zero values:", num_non_zeros, "\n")
+
 #Step 2.3: Replace NA values with zeros (if appropriate for your analysis)
 raster_1km_human_population_threshold_3[is.na(raster_1km_human_population_threshold_3)] <- 0
 plot(raster_1km_human_population_threshold_3)
 # Check if NA values are replaced
 na_count_after <- sum(is.na(values(raster_1km_human_population_threshold_3)))
 print(paste("Number of NA values after replacement:", na_count_after))
+
 #Step 2.4: Get the number of rows and columns from the original raster
 nrows <- nrow(raster_1km_human_population_threshold_3)
 ncols <- ncol(raster_1km_human_population_threshold_3)
+
 #Step 2.5: Convert the raster to a matrix and reshape it
 population_matrix_LH <- matrix(values(raster_1km_human_population_threshold_3), 
                             nrow = nrows, ncol = ncols, byrow = TRUE)
@@ -781,6 +774,7 @@ print(population_matrix_LH[1:10, 1:10])  # Displaying the top-left 10x10 cells
 convolved_matrix_LH <- convolve_image(population_matrix_LH, kernel_matrix_LH)
 
 # Step 4: convert the matrix to raster
+
 # Step 4.1: Convert the convolved matrix back to raster format using terra's rast function
 convolved_raster_LH <- rast(nrows = nrow(raster_1km_human_population_threshold_3),
                                   ncols = ncol(raster_1km_human_population_threshold_3),
@@ -788,8 +782,10 @@ convolved_raster_LH <- rast(nrows = nrow(raster_1km_human_population_threshold_3
                                   xmax = xmax(raster_1km_human_population_threshold_3),
                                   ymin = ymin(raster_1km_human_population_threshold_3),
                                   ymax = ymax(raster_1km_human_population_threshold_3))
+
 # Step 4.2: Assign the values of the convolved matrix back to the raster
 values(convolved_raster_LH) <- convolved_matrix_LH
+
 # Step 4.3: fix crs, extent and resolution
 res(raster_1km_human_population_threshold_3)
 res(convolved_raster_LH)
@@ -797,6 +793,7 @@ crs(raster_1km_human_population_threshold_3)
 crs(convolved_raster_LH)
 ext(raster_1km_human_population_threshold_3)
 ext(convolved_raster_LH)
+
 # Step 4.3: fix crs
 crs(convolved_raster_LH) <- crs(raster_1km_human_population_threshold_3)
 
@@ -806,8 +803,10 @@ plot(kernel_matrix_LH, main = "Kernel Raster")
 plot(convolved_raster_LH, main = "Convolved Raster with Identity Kernel")
 
 # Step 6: mask the ocean
+
 # Step 6.1: import the inland shapefile
 inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
+
 # Step 6.2: mask the output raster
 convolved_raster_masked_LH <- mask(convolved_raster_LH, inland_raster)
 plot(convolved_raster_masked_LH)
@@ -843,97 +842,6 @@ plot(raster_1km_wildlife_probability_stack)
 #Number of humans travelling to see wildlife 
 plot(convolved_raster_masked_LC)
 plot(convolved_raster_masked_LH)
-
-#Multiply occupancy x WTT and multiply probability x WTT
-
-# Define species for carnivores and herbivores (without prefixes)
-carnivores <- c("CANLUP", "LYNLYN", "LYNPAR", "URSARC")
-herbivores <- c("ALCALC", "BISBON", "CAPIBE", "CAPPYR")
-
-# Construct species names for occupancy (M_ prefix)
-carnivores_occupancy <- paste0("M_", carnivores)
-herbivores_occupancy <- paste0("M_", herbivores)
-# Construct species names for probability (P_ prefix)
-carnivores_probability <- paste0("P_", carnivores)
-herbivores_probability <- paste0("P_", herbivores)
-
-# Identify indices in the stacks
-# Occupancy stack
-carnivore_indices_occupancy <- which(names(raster_1km_wildlife_occupancy_stack) %in% carnivores_occupancy)
-herbivore_indices_occupancy <- which(names(raster_1km_wildlife_occupancy_stack) %in% herbivores_occupancy)
-# Probability stack
-carnivore_indices_probability <- which(names(raster_1km_wildlife_probability_stack) %in% carnivores_probability)
-herbivore_indices_probability <- which(names(raster_1km_wildlife_probability_stack) %in% herbivores_probability)
-
-# Split the stacks by species type
-# For occupancy
-occupancy_carnivores <- raster_1km_wildlife_occupancy_stack[[carnivore_indices_occupancy]]
-occupancy_herbivores <- raster_1km_wildlife_occupancy_stack[[herbivore_indices_occupancy]]
-# For probability
-probability_carnivores <- raster_1km_wildlife_probability_stack[[carnivore_indices_probability]]
-probability_herbivores <- raster_1km_wildlife_probability_stack[[herbivore_indices_probability]]
-
-# Multiply rasters
-SB_occupancy_carnivores <- occupancy_carnivores * convolved_raster_masked_LC
-SB_occupancy_herbivores <- occupancy_herbivores * convolved_raster_masked_LH
-SB_probability_carnivores <- probability_carnivores * convolved_raster_masked_LC
-SB_probability_herbivores <- probability_herbivores * convolved_raster_masked_LH
-
-# Combine the results back into stacks
-SB_occupancy <- c(SB_occupancy_carnivores, SB_occupancy_herbivores)
-SB_probability <- c(SB_probability_carnivores, SB_probability_herbivores)
-
-# Rename layers to indicate SB_occupancy and SB_probability
-names(SB_occupancy) <- gsub("^M_", "SB_occ_", names(SB_occupancy))
-names(SB_probability) <- gsub("^P_", "SB_proba_", names(SB_probability))
-
-# Calculate the sum of all layers in each stack
-SB_occ_sum <- sum(SB_occupancy)  # Sum of all SB_occ rasters
-SB_proba_sum <- sum(SB_probability)  # Sum of all SB_proba rasters
-
-# Rename the sum rasters for clarity
-names(SB_occ_sum) <- "SB_occ_sum"
-names(SB_proba_sum) <- "SB_proba_sum"
-
-# Add the sum raster to each stack
-SB_occupancy <- c(SB_occupancy, SB_occ_sum)
-SB_probability <- c(SB_probability, SB_proba_sum)
-
-# Plot
-plot(SB_occupancy)
-plot(SB_probability)
-
-# Verify the new order
-print(names(SB_occupancy))  # Should match desired_order_occupancy
-# Re-order SB_occupancy and SB_probability
-desired_order_occupancy <- c(
-  "SB_occ_CANLUP", "SB_occ_ALCALC", "SB_occ_BISBON", "SB_occ_LYNLYN", 
-  "SB_occ_URSARC", "SB_occ_LYNPAR", "SB_occ_CAPIBE", "SB_occ_CAPPYR", 
-  "SB_occ_sum"
-)
-
-desired_order_probability <- c(
-  "SB_proba_CANLUP", "SB_proba_ALCALC", "SB_proba_BISBON", "SB_proba_LYNLYN", 
-  "SB_proba_URSARC", "SB_proba_LYNPAR", "SB_proba_CAPIBE", "SB_proba_CAPPYR", 
-  "SB_proba_sum"
-)
-
-# Reorder SB_occupancy
-SB_occupancy <- SB_occupancy[[match(desired_order_occupancy, names(SB_occupancy))]]
-
-# Reorder SB_probability
-print(names(SB_occupancy))  # Should match desired_order_occupancy
-print(names(SB_probability))  # Should match desired_order_probability
-
-#Stack WTT, occupancy, proba and the two SB
-WTT_occ_proba_SB_stack <- c(convolved_raster_masked_LC, convolved_raster_masked_LH, raster_1km_wildlife_occupancy_stack, raster_1km_wildlife_probability_stack, SB_occupancy, SB_probability)
-names(WTT_occ_proba_SB_stack)[1:2] <- c("WTT_LC", "WTT_LH")
-
-print(names(WTT_occ_proba_SB_stack)) 
-
-#Export
-#output_WTT_occ_proba_SB_stack <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250106.tif")
-#writeRaster(WTT_occ_proba_SB_stack, output_WTT_occ_proba_SB_stack, overwrite=TRUE)
 
 WTT_occ_proba_SB_stack <- c(convolved_raster_masked_LC, convolved_raster_masked_LH, raster_1km_wildlife_occupancy_stack, raster_1km_wildlife_probability_stack)
 names(WTT_occ_proba_SB_stack)[1:2] <- c("WTT_LC", "WTT_LH")
@@ -984,23 +892,13 @@ goat_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/GOATS/
 goat_population <- rast(goat_population_path)
 plot(goat_population)
 
-pig_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/PIGS/5_Pg_2015_Da.tif"
-pig_population <- rast(pig_population_path)
-plot(pig_population)
-
 sheep_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/SHEEPS/5_Sh_2015_Da.tif"
 sheep_population <- rast(sheep_population_path)
 plot(sheep_population)
 
-livestock_rasters <- c(cow_population, goat_population, pig_population, sheep_population)
+livestock_rasters <- c(cow_population, goat_population, sheep_population)
 
-# Crop the rasters to Europe
-
-# Rasterize the shapefile to align with the raster resolution and extent
-inland_vect <- terra::vect(inland_shapefile)  # convert sf or shapefile to SpatVector
-plot(inland_vect)
-inland_raster <- terra::rasterize(inland_vect, ref_raster, field = 1, background = NA)
-plot(inland_raster)
+# Check extent and resolution, and crop to Europe
 
 # Ensure CRS matches
 livestock_rasters_aligned <- project(livestock_rasters, crs(inland_raster))
@@ -1012,29 +910,27 @@ plot(livestock_rasters_aligned)
 # Mask the livestock rasters with the inland raster
 livestock_rasters_masked <- mask(livestock_rasters_aligned, inland_raster)
 plot(livestock_rasters_masked)
-names(livestock_rasters_masked) <- c("livestock_Cattle", "livestock_Goat", "livestock_Pig", "livestock_Sheep")
+names(livestock_rasters_masked) <- c("livestock_Cattle", "livestock_Goat", "livestock_Sheep")
 
-# Solve the issue of Denmark missing for goats
-# Before summing the 4 layers the absence of Danmark for goats needs to be handled
-# Create a mask for valid land areas (non-NA areas in any raster)
-land_mask <- !is.na(livestock_rasters_masked$livestock_Cattle) | !is.na(livestock_rasters_masked$livestock_Goat) | !is.na(livestock_rasters_masked$livestock_Pig) | !is.na(livestock_rasters_masked$livestock_Sheep)
+# It appear that is the row data Denmark is missing for goats
+# Before summing the 3 layers the absence of Denmark for goats needs to be handled
+# So we create a mask for valid land areas (non-NA areas in any raster)
+land_mask <- !is.na(livestock_rasters_masked$livestock_Cattle) | !is.na(livestock_rasters_masked$livestock_Goat) | !is.na(livestock_rasters_masked$livestock_Sheep)
 
-# Replace NA values with 0 only for summing (for the sum layer)
+# We replace NA values with 0 so we can the sum the layer
 conflict_raster_cow_sum <- livestock_rasters_masked$livestock_Cattle
 conflict_raster_cow_sum[is.na(conflict_raster_cow_sum)] <- 0
 
 conflict_raster_goat_sum <- livestock_rasters_masked$livestock_Goat
 conflict_raster_goat_sum[is.na(conflict_raster_goat_sum)] <- 0
 
-conflict_raster_pig_sum <- livestock_rasters_masked$livestock_Pig
-conflict_raster_pig_sum[is.na(conflict_raster_pig_sum)] <- 0
-
 conflict_raster_sheep_sum <- livestock_rasters_masked$livestock_Sheep
 conflict_raster_sheep_sum[is.na(conflict_raster_sheep_sum)] <- 0
 
 ```
 
-Add reindeer
+An important livestock missing from the dataset are reindeers. However, there is not to my knowledge data on reindeer density in Europe, so I used the population estimations per country that I devided by the area reported for reindeers distribution.
+Source: Moen, J., Forbes, B. C., Löf, A., & Horstkotte, T. (2022). Tipping points and regime shifts in reindeer husbandry: A systems approach. In Reindeer Husbandry and Global Environmental Change. Routledge.
 
 ```{r}
 
@@ -1110,41 +1006,28 @@ Prepare one layer with all livestock species
 ```{r}
 
 # Stack the rasters
-conflict_raster_stack <- c(conflict_raster_cow_sum, conflict_raster_goat_sum, conflict_raster_pig_sum, conflict_raster_sheep_sum, reindeer_population)
-names(conflict_raster_stack)
-plot(conflict_raster_cow_sum)
-
-# Sum the rasters while treating NA as 0
-conflict_raster_stack_summed <- sum(conflict_raster_stack)
-plot(conflict_raster_stack_summed)
-
-# Create a layer without pigs
-conflict_raster_stack_summed_no_pigs <- sum(conflict_raster_cow_sum, conflict_raster_goat_sum, conflict_raster_sheep_sum, reindeer_population)
+conflict_raster_stack_summed <- sum(conflict_raster_cow_sum, conflict_raster_goat_sum, conflict_raster_sheep_sum, reindeer_population)
 
 # Apply the land mask to retain original NA areas
 conflict_raster_stack_summed <- mask(conflict_raster_stack_summed, land_mask, maskvalues=FALSE)
-conflict_raster_stack_summed_no_pigs <- mask(conflict_raster_stack_summed_no_pigs, land_mask, maskvalues=FALSE)
 
 # Have a look
 print(conflict_raster_stack_summed)
-par(mfrow = c(1,2))
-plot(conflict_raster_stack_summed)
-plot(conflict_raster_stack_summed_no_pigs)
 
 # Stack all the rasters
-conflict_raster_stack_complete <- c(livestock_rasters_masked, reindeer_population_masked, conflict_raster_stack_summed, conflict_raster_stack_summed_no_pigs)
-names(conflict_raster_stack_complete)
-names(conflict_raster_stack_complete) <- c("livestock_cow", "livestock_goat", "livestock_pig", "livestock_sheep","livestock_reindeer", "livestock_sum", "livestock_sum_no_pigs")
+conflict_raster_stack_complete <- c(livestock_rasters_masked, reindeer_population_masked, conflict_raster_stack_summed)
+names(conflict_raster_stack_complete) <- c("livestock_cow", "livestock_goat", "livestock_sheep", "livestock_reindeer", "livestock_sum")
 plot(conflict_raster_stack_complete)
 
 ```
 
-Clean data for social conflicts: livestock density, current Canis lipus and Ursus arctos distribution, potential Canis lipus and Ursus arctos distribution
+To visualize the conflicts we consider livestock and carnivores Canis lupus and Ursus arctos.
+Here are clean data for social conflicts: 1) livestock density, 2) current Canis lupus and Ursus arctos distribution, 3) potential Canis lupus and Ursus arctos distribution
 
 ```{r}
 
 # livestock population as continuous
-plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
+plot(conflict_raster_stack_complete$livestock_sum)
 
 # requires species (bear and wolf) expansion as binary (threshold at 0.5) and livestock population as continuous
 
@@ -1155,7 +1038,6 @@ plot(P_CN_UA)
 P_CN_UA_threshold <- classify(P_CN_UA, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
 # Plot to check
 plot(P_CN_UA_threshold, main = "Binary probability (≥0.5 = 1)")
-
 
 # Where species (bear and wolf) already there as binary
 # Sum CANLUP and URSARC current
@@ -1165,18 +1047,6 @@ plot(M_CN_UA)
 M_CN_UA_binary <- ifel(M_CN_UA > 0, 1, NA)
 plot(M_CN_UA_binary)
 
-# requires species (bear and wolf) expansion as binary (threshold at 0.5) and livestock population as continuous
-# Sum CANLUP and URSARC proba
-P_CN_UA <- WTT_occ_proba_SB_stack$P_CANLUP + WTT_occ_proba_SB_stack$P_URSARC
-plot(P_CN_UA)
-# Potential expansion with a combined probability of at least 0.5 (threshold)
-P_CN_UA_threshold <- classify(P_CN_UA, matrix(c(-Inf, 0.5, 0, 0.5, Inf, 1), ncol = 3, byrow = TRUE))
-# Plot to check
-plot(P_CN_UA_threshold, main = "Binary probability (≥0.5 = 1)")
-
-# livestock population as continuous
-plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
-
 ```
 
 ## 3.4: Export each layer so there is no need to process all the data each time
@@ -1185,33 +1055,37 @@ plot(conflict_raster_stack_complete$livestock_sum_no_pigs)
 
 output_dir = 
 
-writeRaster(hanpp_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
+# Climate change mitigation
+  
+writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+hanpp_masked <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_hanpp_T8_masked_250716.tif"
 
-writeRaster(abandonment_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
+writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(pot_carbon_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
+writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(high_meff_masked, filename = file.path(output_dir, ".tif"), overwrite = TRUE)
+# Climate change adaptation
 
-writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked_250716.tif"), overwrite = TRUE)
+writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked_250716.tif"), overwrite = TRUE)
+writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
+# Social benefits
 
+writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
+writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(WTT_average_masked, filename = file.path(output_dir, "layers_maps_WTT_average_masked_250716.tif"), overwrite = TRUE)
+writeRaster(P_SUM_threshold, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(M_sum_binary_sub, filename = file.path(output_dir, "layers_maps_M_sum_binary_sub_250716.tif"), overwrite = TRUE)
+# Social Conflict
 
-writeRaster(P_SUM_threshold_masked, filename = file.path(output_dir, "layers_maps_P_SUM_threshold_masked_250716.tif"), overwrite = TRUE)
+livestock_sum <- conflict_raster_stack_complete_masked$livestock_sum
+writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-livestock_sum_no_pigs <- conflict_raster_stack_complete_masked$livestock_sum_no_pigs
-writeRaster(livestock_sum_no_pigs, filename = file.path(output_dir, "layers_maps_livestock_sum_no_pigs_masked_250716.tif"), overwrite = TRUE)
+writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
-writeRaster(M_sub, filename = file.path(output_dir, "layers_maps_wolf_bear_masked_250716.tif"), overwrite = TRUE)
-
-writeRaster(P_CN_UA_threshold_masked, filename = file.path(output_dir, "layers_maps_P_CN_UA_threshold_masked_250716.tif"), overwrite = TRUE)
+writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
 
 ```
 
@@ -1223,16 +1097,15 @@ Low land use intensity
 
 ```{r}
 
-naturalness <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_hanpp_T8_masked_250716.tif"
-naturalness <- rast(naturalness)
-plot(naturalness)
+hanpp_masked <- rast(hanpp_masked)
+plot(hanpp_masked)
 
 # Convert raster to data frame for ggplot
-df_nat <- as.data.frame(naturalness, xy = TRUE)
+df_nat <- as.data.frame(hanpp_masked, xy = TRUE)
 names(df_nat)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
-df_nat$value <- factor(df_nat$value, levels = c(0, 1))
+df_hanpp$value <- factor(df_nat$value, levels = c(0, 1))
 
 # Define colors
 nat_colors <- c(
@@ -1242,11 +1115,11 @@ nat_colors <- c(
 
 nat_labels <- c(
   "0" = "Other land",
-  "1" = "High naturalness"
+  "1" = "Natural disturbance regime"
 )
 
 # Plot with ggplot
-map_naturalness <- ggplot(df_nat, aes(x = x, y = y, fill = value)) +
+map_hanpp <- ggplot(df_hanpp, aes(x = x, y = y, fill = value)) +
   geom_tile() +
   scale_fill_manual(
     values = nat_colors,
