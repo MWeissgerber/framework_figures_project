@@ -28,9 +28,6 @@ library(ravetools)
 install.packages('dplyr') # Provides functions for common data manipulation tasks such as filtering, selecting, and summarizing data.
 library(dplyr)
 
-install.packages("xfun") # Provides supporting utility functions commonly used in R Markdown workflows.
-library(xfun)
-
 # For plotting
 
 install.packages('ggplot2') # Used to create data visualizations using the grammar of graphics framework.
@@ -38,25 +35,6 @@ library(ggplot2)
 
 install.packages("cowplot") # Provides functions for aligning and combining multiple ggplot2 plots.
 library(cowplot)
-
-
-install.packages("gridExtra") # Used to arrange multiple plots or graphical objects in a single layout.
-library(gridExtra)
-
-install.packages("tidyterra") # Integrates terra raster data with tidyverse workflows and ggplot2 visualizations.
-library(tidyterra)
-
-install.packages("ggspatial") # Adds spatial map elements such as scale bars and north arrows to ggplot2 maps.
-library(ggspatial)
-
-install.packages("ggtext") # Enables markdown or HTML formatting in ggplot2 plot text elements.
-library(ggtext)
-
-install.packages("patchwork") # Provides tools to combine multiple ggplot2 plots into a single figure layout.
-library(patchwork)
-
-install.packages("grid") # Base R system for low-level control of graphical objects and plot layout.
-library(grid)
 
 ```
 
@@ -1853,6 +1831,8 @@ ggsave(
   width = 26, height = 25, units = 'cm', dpi = 300
 )
 
+# LEGEND SECTION ------------------------------------------------------------
+
 # Step 10: Legend
 legend_df_pot_carbon <- expand.grid(
   base_level = 1:10,
@@ -1909,14 +1889,18 @@ ggsave(
   width = 24, height = 10, units = 'cm', dpi = 300
 )
 
-# Step 11: Combine map and legend
+# The figure in the article is built upon the maps and legend as separate .png files, here are two supplementary steps to have both together
+
+############ Combine map and legend
+
+# Combine the fixed legend with the map
 final_plot_pot_carbon <- cowplot::plot_grid(
   pot_carbon_abandonment_map,
   pot_carbon_abandonment_legend,
   ncol = 2
 )
 
-# Step 12: Save final composite
+# Save final composite
 ggsave(
   file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend_260324.png"),
   plot = final_plot_pot_carbon,
@@ -2017,6 +2001,8 @@ ggsave(
   width = 26, height = 25, units = 'cm', dpi = 300
 )
 
+# LEGEND SECTION ------------------------------------------------------------
+
 # Step 10: Legend
 legend_df_cv <- expand.grid(
   base_level = 1:10,
@@ -2073,14 +2059,18 @@ ggsave(
   width = 24, height = 10, units = 'cm', dpi = 300
 )
 
-# Step 11: Combine map and legend
+# The figure in the article is built upon the maps and legend as separate .png files, here are two supplementary steps to have both together
+
+############ Combine map and legend
+
+# Combine the fixed legend with the map
 final_plot_cv <- cowplot::plot_grid(
   cv_abandonment_map,
   cv_abandonment_legend,
   ncol = 2
 )
 
-# Step 12: Save final composite
+# Save final composite
 ggsave(
   file.path(output_dir, "cv_abandonment_meff_map_with_legend_260324.png"),
   plot = final_plot_cv,
@@ -2178,7 +2168,7 @@ WTT_species_map <- ggplot() +
       hjust = 0.5       # centers the title
     ))
  
-# Step C: Save
+# Step 8: Save
 ggsave(
   file.path(output_dir, 'WTT_with_species_binary_map_260324.png'),
   plot = WTT_species_map,
@@ -2188,15 +2178,15 @@ ggsave(
   dpi = 300
 )
 
-###### Legend
+# LEGEND SECTION ------------------------------------------------------------
 
-# Step 1: Build the legend data frame
+# Step 9: Build the legend data frame
 legend_df_WTT <- expand.grid(
   base_level = 1:10,
   expansion = c("No species gained", "P_SUM gained", "M_SUM gained")
 )
 
-# Step 5: Define 30-class palette
+# Step 10: Define 30-class palette
 
 legend_palette <- c(
   # 1-10: Shades of grey for no abandonment
@@ -2210,7 +2200,7 @@ legend_palette <- c(
   "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
 )
 
-# Step 2: Map the correct colors
+# Step 11: Map the correct colors
 legend_df_WTT <- legend_df_WTT %>%
   mutate(
     expansion = recode(
@@ -2226,10 +2216,10 @@ legend_df_WTT <- legend_df_WTT %>%
     )
   )
 
-# Step 3: Use rounded NPP quantile labels
+# Step 12: Use rounded NPP quantile labels
 WTT_legend_limits <- round(WTT_breaks)
 
-# Step 4: Plot the legend
+# Step 13: Plot the legend
 WTT_species_legend <- ggplot(legend_df_WTT, aes(x = base_level, y = expansion, fill = color)) +
   geom_tile() +
   scale_fill_identity() +
@@ -2255,7 +2245,7 @@ WTT_species_legend <- ggplot(legend_df_WTT, aes(x = base_level, y = expansion, f
   ) +
   coord_fixed(ratio = 0.5)
 
-# Step 5: Display
+# Step 14: Display
 plot(WTT_species_legend)
 
 ggsave(
@@ -2263,6 +2253,8 @@ ggsave(
   plot = WTT_species_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
+
+# The figure in the article is built upon the maps and legend as separate .png files, here are two supplementary steps to have both together
 
 ############ Combine map and legend
 
@@ -2274,7 +2266,7 @@ final_plot <- cowplot::plot_grid(
   rel_heights = c(5, 1)
 )
 
-# Optionally save
+# Save
 ggsave(
   file.path(output_dir, "WTT_with_species_binary_map_with_legend_260324_2.png"),
   plot = final_plot,
@@ -2293,11 +2285,11 @@ Social conflicts (livestock density x (carnivores current distribution and poten
 # Bivariate mapping: binary species expansion x 10 levels of people travelling (wolf & bear only)
 
 # Step 0: Remove overlap between current and proba
-M_sub <- M_CN_UA_binary_masked - P_CN_UA_threshold_masked
+M_sub <- M_CN_UA_binary - P_CN_UA_threshold
 M_sub <- ifel(M_sub == -1, 0, M_sub)
 
 # Step 1: Livestock and classify into 10 quantiles
-livestock_ceil <- ceiling(conflict_raster_stack_complete_masked$livestock_sum_no_pigs)
+livestock_ceil <- ceiling(livestock_sum)
 livestock_breaks <- quantile(values(livestock_ceil), probs = seq(1, 0, length.out = 11), na.rm = TRUE)
 
 # Step 2: Create classification matrix with bins 10 → 1, but keep ranges increasing
@@ -2316,19 +2308,20 @@ reversed_class_matrix <- matrix(c(
 livestock_classified_10 <- classify(livestock_ceil, rcl = reversed_class_matrix)
 plot(livestock_classified_10)
 
-# Step 2: Encode states
-livestock_M <- ifel(M_sub == 1 & P_CN_UA_threshold_masked == 0, livestock_classified_10 + 20, NA)
-livestock_P <- ifel(P_CN_UA_threshold_masked == 1 & M_sub == 0, livestock_classified_10 + 10, NA)
-livestock_none <- ifel(M_sub == 0 & P_CN_UA_threshold_masked == 0, livestock_classified_10, NA)
+# Step 3: Encode states
+livestock_M <- ifel(M_sub == 1 & P_CN_UA_threshold == 0, livestock_classified_10 + 20, NA)
+livestock_P <- ifel(P_CN_UA_threshold == 1 & M_sub == 0, livestock_classified_10 + 10, NA)
+livestock_none <- ifel(M_sub == 0 & P_CN_UA_threshold == 0, livestock_classified_10, NA)
 
-# Step 3: Merge the rasters
+# Step 4: Merge the rasters
 livestock_combined <- merge(livestock_none, livestock_P, livestock_M)
+plot(livestock_combined)
 
-# Step 4: Convert to dataframe
+# Step 5: Convert to dataframe
 livestock_df <- as.data.frame(livestock_combined, xy = TRUE)
 colnames(livestock_df) <- c("x", "y", "value")
 
-# Step 5: Define 30-class palette
+# Step 6: Define 30-class palette
 abandon_palette <- c(
   # 1-10: Shades of grey for no abandonment
   "#FAFAFA", "#F0F0F0", "#E0E0E0", "#D6D6D6", "#C4C4C4",
@@ -2341,14 +2334,14 @@ abandon_palette <- c(
   "#e08214", "#cc6d0d", "#b35806", "#a34906", "#7f3b08"
 )
 
-# Step 6: Assign colors
+# Step 7: Assign colors
 livestock_df <- livestock_df %>%
   mutate(color = case_when(
     value >= 1  & value <= 30 ~ abandon_palette[value],
     TRUE ~ "#d3d3d3"
   ))
 
-# Step 7: Map
+# Step 8: Map
 livestock_map <- ggplot() +
   geom_tile(data = livestock_df, aes(x = x, y = y, fill = color)) +
   scale_fill_identity() +
@@ -2370,21 +2363,23 @@ livestock_map <- ggplot() +
       hjust = 0.5       # centers the title
     ))
 
+# Step 9: Save
+
 ggsave(
-  file.path(output_dir, 'livestock_wolf_bear_species_map_1.png'),
+  file.path(output_dir, 'livestock_wolf_bear_species_map_260324.png'),
   plot = livestock_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
 
 # LEGEND SECTION ------------------------------------------------------------
 
-# Build legend df
+# Step 10: Build legend df
 legend_df <- expand.grid(
   base_level = 1:10,
   expansion = c("No species gained", "P_SUM gained", "M_SUM gained")
 )
 
-# Recode and assign palette
+# Step 11: Recode and assign palette
 legend_palette <- abandon_palette
 legend_df <- legend_df %>%
   mutate(
@@ -2403,7 +2398,7 @@ legend_df <- legend_df %>%
 
 livestock_legend_limits <- round(livestock_breaks)
 
-# Plot legend
+# Step 12: Plot legend
 livestock_legend <- ggplot(legend_df, aes(x = base_level, y = expansion, fill = color)) +
   geom_tile() +
   scale_fill_identity() +
@@ -2429,20 +2424,26 @@ livestock_legend <- ggplot(legend_df, aes(x = base_level, y = expansion, fill = 
   ) +
   coord_fixed(ratio = 0.5)
 
-# Step 5: Display
+# Step 13: Display
 plot(livestock_legend)
 
+# Step 14: Save
 ggsave(
-  file.path(output_dir, 'livestock_wolf_bear_species_legend_1.png'),
+  file.path(output_dir, 'livestock_wolf_bear_species_legend_260324.png'),
   plot = livestock_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
 
-# Save combined
+# The figure in the article is built upon the maps and legend as separate .png files, here are two supplementary steps to have both together
+
+############ Combine map and legend
+
+# Combine the fixed legend with the map
 final_plot <- plot_grid(livestock_map, livestock_legend, ncol = 2)
 
+# Save combined
 ggsave(
-  file.path(output_dir, "livestock_wolf_bear_species_map_with_legend_3levels_purple_2.png"),
+  file.path(output_dir, "livestock_wolf_bear_species_map_with_legend_260324.png"),
   plot = final_plot,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -2465,10 +2466,10 @@ extract_top80_bins <- function(classified_raster, binary_mask, top_bins = c(3, 4
 }
 
 # Apply function to each pair
-carbon_top80_stack <- extract_top80_bins(pot_carbon_classified, aban_masked)
-cv_top80_stack  <- extract_top80_bins(cv_classified, aban_masked)
-wtt_top80_stack <- extract_top80_bins(WTT_classified, P_SUM_threshold_masked)
-livestock_top80_stack <- extract_top80_bins(livestock_classified_10, P_CN_UA_threshold_masked)
+carbon_top80_stack <- extract_top80_bins(pot_carbon_classified, abandonment_masked)
+cv_top80_stack  <- extract_top80_bins(cv_classified, abandonment_masked)
+wtt_top80_stack <- extract_top80_bins(WTT_classified, P_SUM_threshold)
+livestock_top80_stack <- extract_top80_bins(livestock_classified_10, P_CN_UA_threshold)
 
 # Stack for inspection or export
 top80_stacks <- c(carbon_top80_stack, cv_top80_stack, wtt_top80_stack, livestock_top80_stack)
@@ -2480,11 +2481,11 @@ plot(wtt_top80_stack)
 plot(livestock_top80_stack)
 
 # Export to the correct output directory
-writeRaster(top80_stacks, filename = file.path(output_dir, "rewilding_opportunity_top40_250707.tif"), overwrite = TRUE)
+writeRaster(top80_stacks, filename = file.path(output_dir, "rewilding_opportunity_top80_260324.tif"), overwrite = TRUE)
 
 # NPP Top 80%
-png(file.path(output_dir, "npp_top80_map.png"), width = 800, height = 800, res = 150)
-plot(npp_top40_stack, main = "Top 80% NPP × Abandonment")
+png(file.path(output_dir, "carbon_top80_map.png"), width = 800, height = 800, res = 150)
+plot(carbon_top80_stack, main = "Top 80% NPP × Abandonment")
 dev.off()
 
 # CV Top 80%
@@ -2499,7 +2500,7 @@ dev.off()
 
 # Livestock Top 80%
 png(file.path(output_dir, "livestock_top80_map.png"), width = 800, height = 800, res = 150)
-plot(livestock_top40_stack, main = "Top 80% Livestock × Expansion")
+plot(livestock_top80_stack, main = "Top 80% Livestock × Expansion")
 dev.off()
 
 ```
@@ -2528,7 +2529,7 @@ only_one <- function(target, others) {
 others_cv80 <- c(carbon80, wtt80, livestock80)
 others_carbon80 <- c(cv80, wtt80, livestock80)
 others_wtt80 <- c(carbon80, cv80, livestock80)
-others_livestock80 <- c(carbon80, cv40, wtt80)
+others_livestock80 <- c(carbon80, cv80, wtt80)
 
 # Compute exclusive layers
 carbon_only80 <- only_one(values(carbon80), values(others_carbon80))
@@ -2548,7 +2549,87 @@ names(exclusive_stack80) <- c("carbon_only80", "cv_only80", "wtt_only80", "lives
 
 # Plot or export
 plot(exclusive_stack80)
-writeRaster(exclusive_stack80, filename = file.path(output_dir, "exclusive_overlap_stack80.tif"), overwrite = TRUE)
+writeRaster(exclusive_stack80, filename = file.path(output_dir, "exclusive_overlap_stack80_260324.tif"), overwrite = TRUE)
+
+```
+
+No overlap
+
+```{r}
+
+plot(exclusive_stack80)
+names(exclusive_stack80)
+
+# Step 1: Assign unique values
+carbon_map <- ifel(exclusive_stack80$carbon_only80 == 1, 1, NA)
+cv_map <- ifel(exclusive_stack80$cv_only80 == 1, 2, NA)
+wtt_map <- ifel(exclusive_stack80$wtt_only80 == 1, 3, NA)
+livestock_map <- ifel(exclusive_stack80$livestock_only80 == 1, 4, NA)
+
+# Add background category = 0 where all are NA
+all_na <- is.na(carbon_map) & is.na(cv_map) & is.na(wtt_map) &
+          is.na(livestock_map)
+
+background_map <- ifel(all_na, 0, NA)  # gray background
+
+# Step 2: Combine layers (priority-based, highest takes precedence)
+combined_map <- merge(
+  background_map,
+  carbon_map, cv_map, wtt_map, livestock_map
+)
+
+combined_map_masked <- mask(combined_map, inland_raster)
+
+# Step 3: Convert to dataframe for ggplot
+map_df <- as.data.frame(combined_map_masked, xy = TRUE)
+colnames(map_df)[3] <- "category"
+
+# Remove NA rows only now
+map_df <- map_df[!is.na(map_df$category), ]
+
+# Step 4: Define custom color palette and labels
+category_colors <- c(
+  "0" = "#ECECEC",  # gray background
+  "1" = "#FFD128",
+  "2" = "#43C245",
+  "3" = "#7DDEEE",
+  "4" = "#DB7DEE"
+)
+
+category_labels <- c(
+  "0" = "No opportunity",
+  "1" = "High mitigation",
+  "2" = "High adaptation",
+  "3" = "High social benefit",
+  "4" = "Low conflict"
+)
+
+# Saving for the later map
+map_df_opp_single_80 <- map_df
+
+# Step 5: Plot with ggplot + borders and coastlines
+map_opportunities_one <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = category_colors,
+    labels = category_labels,
+    name = "Single rewilding opportunity"
+  ) +
+  # Add country borders and coastlines
+  geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
+  coord_sf(
+    xlim = c(2635973, 6525973),  # adapte les limites si nécessaire
+    ylim = c(1448659, 5415659),
+    expand = FALSE
+  ) +
+  theme_minimal()
+
+ggsave(
+  file.path(output_dir, 'no_overlap_stack80_260324.png'),
+  plot = map_opportunities_one,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
 
 ```
 
@@ -2582,7 +2663,6 @@ names(overlap_stack80) <- c("carbon_cv80", "carbon_wtt80", "carbon_livestock80",
 
 # Plot or save
 plot(overlap_stack80)
-names(overlap_stack80)
 
 # Step 1: Assign unique values
 carbon_cv_map80 <- ifel(overlap_stack80$carbon_cv80 == 1, 1, NA)
@@ -2634,10 +2714,11 @@ category_labels <- c(
   "6" = "High social benefit & low conflict"
 )
 
-map_df_opp_two_80_carbon <- map_df
+# Saving for the later map
+map_df_opp_two_80 <- map_df
 
 # Step 5: Plot with ggplot + borders and coastlines
-map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+map_opportunities_two <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
   geom_tile() +
   scale_fill_manual(
     values = category_colors,
@@ -2653,6 +2734,12 @@ geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes =
     expand = FALSE
   ) +
   theme_minimal()
+
+ggsave(
+  file.path(output_dir, 'two_overlap_stack80_260324.png'),
+  plot = map_opportunities_two,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
 
 ```
 
@@ -2730,11 +2817,11 @@ category_labels <- c(
   "4" = "High adaptation, high social benefit & low conflict"
 )
 
-map_df_opp_three_40_carbon <- map_df
-map_df_opp_three_80_carbon <- map_df_opp_three_40_carbon 
+# Saving for the later map
+map_df_opp_three_80 <- map_df 
 
 # Step 5: Plot with ggplot + borders and coastlines
-map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+map_opportunities_three <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
   geom_tile() +
   scale_fill_manual(
     values = category_colors,
@@ -2750,6 +2837,12 @@ geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes =
     expand = FALSE
   ) +
   theme_minimal()
+
+ggsave(
+  file.path(output_dir, 'three_overlap_stack80_260324.png'),
+  plot = map_opportunities_three,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
 
 ```
 
@@ -2793,10 +2886,11 @@ category_labels <- c(
   "1" = "High mitigation, high adaptation &\n high social benefit & low conflict"
 )
 
-map_df_opp_four_80_carbon <- map_df
+# Saving for the later map
+map_df_opp_four_80 <- map_df
 
 # Step 3: Plot
-map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
+map_opportunities_four <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) +
   geom_tile() +
   scale_fill_manual(
     values = category_colors,
@@ -2812,6 +2906,12 @@ map_opportunities <- ggplot(map_df, aes(x = x, y = y, fill = factor(category))) 
   ) +
   theme_minimal()
 
+ggsave(
+  file.path(output_dir, 'four_overlap_stack80_260324.png'),
+  plot = map_opportunities_four,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
+
 ```
 
 Map the number of overlaps
@@ -2819,16 +2919,16 @@ Map the number of overlaps
 ```{r}
 
 # Step 1: Keep 0 when 0, retain all values
-map_df_opp_single_80_carbon$category <- ifelse(map_df_opp_single_80_carbon$category != 0, 1, 0)
-map_df_opp_two_80_carbon$category    <- ifelse(map_df_opp_two_80_carbon$category != 0, 2, 0)
-map_df_opp_three_80_carbon$category  <- ifelse(map_df_opp_three_80_carbon$category != 0, 3, 0)
-map_df_opp_four_80_carbon$category   <- ifelse(map_df_opp_four_80_carbon$category != 0, 4, 0)
+map_df_opp_single_80$category <- ifelse(map_df_opp_single_80$category != 0, 1, 0)
+map_df_opp_two_80$category    <- ifelse(map_df_opp_two_80$category != 0, 2, 0)
+map_df_opp_three_80$category  <- ifelse(map_df_opp_three_80$category != 0, 3, 0)
+map_df_opp_four_80$category   <- ifelse(map_df_opp_four_80$category != 0, 4, 0)
 
 # Step 2: Keep only rows where category != 0 (to avoid double-counting), retain ocean as NA
-df1 <- map_df_opp_single_80_carbon[map_df_opp_single_80_carbon$category != 0, ]
-df2 <- map_df_opp_two_80_carbon[map_df_opp_two_80_carbon$category != 0, ]
-df3 <- map_df_opp_three_80_carbon[map_df_opp_three_80_carbon$category != 0, ]
-df4 <- map_df_opp_four_80_carbon[map_df_opp_four_80_carbon$category != 0, ]
+df1 <- map_df_opp_single_80[map_df_opp_single_80$category != 0, ]
+df2 <- map_df_opp_two_80[map_df_opp_two_80$category != 0, ]
+df3 <- map_df_opp_three_80[map_df_opp_three_80$category != 0, ]
+df4 <- map_df_opp_four_80[map_df_opp_four_80$category != 0, ]
 
 # Step 3: Merge priority-wise (4 → 3 → 2 → 1)
 map_df <- rbind(df1, df2, df3, df4)
@@ -2836,13 +2936,13 @@ map_df <- map_df[order(map_df$x, map_df$y, -map_df$category), ]  # prioritize hi
 map_df <- map_df[!duplicated(map_df[, c("x", "y")]), ]            # remove duplicates, keep highest
 
 # Step 4: Rebuild NA + 0 base from any of the original full maps
-base_template <- map_df_opp_single_80_carbon[, c("x", "y")]
+base_template <- map_df_opp_single_80[, c("x", "y")]
 map_df_final <- merge(base_template, map_df, by = c("x", "y"), all.x = TRUE)
 
 # Step 5: Replace NA in category with 0 (only for land areas that had no opportunities)
 # Note: leave real NA (ocean) untouched
 map_df_final$category <- ifelse(
-  is.na(map_df_final$category) & !is.na(map_df_opp_single_40_carbon$category),
+  is.na(map_df_final$category) & !is.na(map_df_opp_single_80$category),
   0,
   map_df_final$category
 )
@@ -2868,7 +2968,7 @@ category_labels <- c(
 )
 
 # Step 5: Plot base map
-map_opportunities <- ggplot(map_df_final, aes(x = x, y = y, fill = factor(category))) +
+map_opportunities_number <- ggplot(map_df_final, aes(x = x, y = y, fill = factor(category))) +
   geom_tile() +
   scale_fill_manual(
     values = category_colors,
@@ -2884,6 +2984,11 @@ map_opportunities <- ggplot(map_df_final, aes(x = x, y = y, fill = factor(catego
   ) +
   theme_minimal()
 
+ggsave(
+  file.path(output_dir, 'number_of_overlap_stack80_260324.png'),
+  plot = map_opportunities_number,
+  width = 26, height = 25, units = 'cm', dpi = 300
+)
 
 ```
 
