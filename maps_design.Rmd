@@ -16,9 +16,6 @@ renv::restore()
 install.packages('sf') # Provides functions to read, write, and manipulate spatial vector data (points, lines, polygons).
 library(sf)
 
-install.packages('ggplot2') # Used to create data visualizations using the grammar of graphics framework.
-library(ggplot2)
-
 install.packages('data.table') # Provides functions for efficient manipulation and processing of large tabular datasets.
 library(data.table)
 
@@ -28,9 +25,6 @@ library(terra)
 install.packages('ravetools') # for the function convolve_image
 library(ravetools)
 
-
-
-
 install.packages('dplyr') # Provides functions for common data manipulation tasks such as filtering, selecting, and summarizing data.
 library(dplyr)
 
@@ -38,6 +32,13 @@ install.packages("xfun") # Provides supporting utility functions commonly used i
 library(xfun)
 
 # For plotting
+
+install.packages('ggplot2') # Used to create data visualizations using the grammar of graphics framework.
+library(ggplot2)
+
+install.packages("cowplot") # Provides functions for aligning and combining multiple ggplot2 plots.
+library(cowplot)
+
 
 install.packages("gridExtra") # Used to arrange multiple plots or graphical objects in a single layout.
 library(gridExtra)
@@ -47,9 +48,6 @@ library(tidyterra)
 
 install.packages("ggspatial") # Adds spatial map elements such as scale bars and north arrows to ggplot2 maps.
 library(ggspatial)
-
-install.packages("cowplot") # Provides functions for aligning and combining multiple ggplot2 plots.
-library(cowplot)
 
 install.packages("ggtext") # Enables markdown or HTML formatting in ggplot2 plot text elements.
 library(ggtext)
@@ -186,7 +184,11 @@ plot(aban_simple_proj)
 aban_simple_aligned <- terra::resample(aban_simple_proj, ref_raster, method = "near")  # use "bilinear" for continuous data
 plot(aban_simple_aligned)
 # Masked so only areas of interest are kept
-abandonment_masked <- mask(aban_simple_aligned, inland_raster)
+abandonment_masked <- ifel(
+  is.na(inland_raster), 
+  NA,                      # outside → NA
+  ifel(is.na(aban_simple_aligned), 0, aban_simple_aligned)  # inside → NA → 0
+)
 plot(abandonment_masked)
 
 ```
@@ -1049,43 +1051,53 @@ plot(M_CN_UA_binary)
 
 ```
 
-## 3.4: Export each layer so there is no need to process all the data each time
+## 3.4: Export and import each layer so there is no need to process all the data each time
 
 ```{r}
 
-output_dir = 
+output_dir = "S:/Magali_Weissgerber/Data_framework_verifying_260324"
 
 # Climate change mitigation
   
-writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
-hanpp_masked <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_hanpp_T8_masked_250716.tif"
+writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_hanpp_masked_260324.tif"), overwrite = TRUE)
+hanpp_masked <- rast(file.path(output_dir, "layers_maps_hanpp_masked_260324.tif"))
 
-writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked_260324.tif"), overwrite = TRUE)
+abandonment_masked <- rast(file.path(output_dir, "layers_maps_abandonment_masked_260324.tif"))
 
-writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked_260324.tif"), overwrite = TRUE)
+pot_carbon_masked <- rast(file.path(output_dir, "layers_maps_pot_carbon_masked_260324.tif"))
 
 # Climate change adaptation
 
-writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_high_meff_masked_260324.tif"), overwrite = TRUE)
+high_meff_masked <- rast(file.path(output_dir, "layers_maps_high_meff_masked_260324.tif"))
 
-writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked_260324.tif"), overwrite = TRUE)
+cv_masked <- rast(file.path(output_dir, "layers_maps_cv_masked_260324.tif"))
 
 # Social benefits
 
-writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_WTT_average_260324.tif"), overwrite = TRUE)
+WTT_average <- rast(file.path(output_dir, "layers_maps_WTT_average_260324.tif"))
 
-writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_M_sum_binary_260324.tif"), overwrite = TRUE)
+M_sum_binary <- rast(file.path(output_dir, "layers_maps_M_sum_binary_260324.tif"))
 
-writeRaster(P_SUM_threshold, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(P_SUM_threshold, filename = file.path(output_dir, "layers_maps_P_SUM_threshold_260324.tif"), overwrite = TRUE)
+P_SUM_threshold <- rast(file.path(output_dir, "layers_maps_P_SUM_threshold_260324.tif"))
 
 # Social Conflict
 
-livestock_sum <- conflict_raster_stack_complete_masked$livestock_sum
-writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+livestock_sum <- conflict_raster_stack_complete$livestock_sum
+writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_livestock_sum_260324.tif"), overwrite = TRUE)
+livestock_sum <- rast(file.path(output_dir, "layers_maps_livestock_sum_260324.tif"))
 
-writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_M_CN_UA_binary_260324.tif"), overwrite = TRUE)
+M_CN_UA_binary <- rast(file.path(output_dir, "layers_maps_M_CN_UA_binary_260324.tif"))
 
-writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_TBA_260323.tif"), overwrite = TRUE)
+writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_P_CN_UA_threshold_260324.tif"), overwrite = TRUE)
+P_CN_UA_threshold <- rast(file.path(output_dir, "layers_maps_P_CN_UA_threshold_260324.tif"))
 
 ```
 
@@ -1093,19 +1105,18 @@ writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_TBA
 
 # 1. Current
 
-Low land use intensity
+Low land use intensity = natural disturbance regime
 
 ```{r}
 
-hanpp_masked <- rast(hanpp_masked)
 plot(hanpp_masked)
 
 # Convert raster to data frame for ggplot
-df_nat <- as.data.frame(hanpp_masked, xy = TRUE)
-names(df_nat)[3] <- "value"
+df_hanpp <- as.data.frame(hanpp_masked, xy = TRUE)
+names(df_hanpp)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
-df_hanpp$value <- factor(df_nat$value, levels = c(0, 1))
+df_hanpp$value <- factor(df_hanpp$value, levels = c(0, 1))
 
 # Define colors
 nat_colors <- c(
@@ -1143,11 +1154,10 @@ map_hanpp <- ggplot(df_hanpp, aes(x = x, y = y, fill = value)) +
   labs(title = "High naturalness in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_naturalness_250916_1.png'),
-  plot = map_naturalness,
+  file.path(output_dir, 'intermediary_map_intensity_260324.png'),
+  plot = map_hanpp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
-
 
 ```
 
@@ -1155,12 +1165,10 @@ Effective mesh size
 
 ```{r}
 
-meff <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_meff_T8_masked_250716.tif"
-meff <- rast(meff)
-plot(meff)
+plot(high_meff_masked)
 
 # Convert raster to data frame for ggplot
-df_meff <- as.data.frame(meff, xy = TRUE)
+df_meff <- as.data.frame(high_meff_masked, xy = TRUE)
 names(df_meff)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
@@ -1202,7 +1210,7 @@ map_meff <- ggplot(df_meff, aes(x = x, y = y, fill = value)) +
   labs(title = "High effective mesh size in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_meff_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_meff_260324.png'),
   plot = map_meff,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1210,20 +1218,18 @@ ggsave(
 
 ```
 
-Current 8 mammal species for ecotourism
+Current 8 mammal species for social benefit
 
 ```{r}
 
-ecotourism <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_M_sum_binary_sub_250716.tif"
-ecotourism <- rast(ecotourism)
-plot(ecotourism)
+plot(M_sum_binary)
 
 # Convert raster to data frame for ggplot
-df_ecotourism <- as.data.frame(ecotourism, xy = TRUE)
-names(df_ecotourism)[3] <- "value"
+df_M_sum_binary <- as.data.frame(M_sum_binary, xy = TRUE)
+names(df_M_sum_binary)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
-df_ecotourism$value <- factor(df_ecotourism$value, levels = c(0, 1))
+df_M_sum_binary$value <- factor(df_M_sum_binary$value, levels = c(0, 1))
 
 # Define colors
 ecotourism_colors <- c(
@@ -1237,7 +1243,7 @@ ecotourism_labels <- c(
 )
 
 # Plot with ggplot
-map_ecotourism <- ggplot(df_ecotourism, aes(x = x, y = y, fill = value)) +
+map_species_current <- ggplot(df_M_sum_binary, aes(x = x, y = y, fill = value)) +
   geom_tile() +
   scale_fill_manual(
     values = ecotourism_colors,
@@ -1261,8 +1267,8 @@ map_ecotourism <- ggplot(df_ecotourism, aes(x = x, y = y, fill = value)) +
   labs(title = "Large mammals current distribution without expansion in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_current_sp_250916_1.png'),
-  plot = map_ecotourism,
+  file.path(output_dir, 'intermediary_map_M_sum_binary_260324.png'),
+  plot = map_species_current,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
 
@@ -1273,16 +1279,14 @@ Carnivores current
 
 ```{r}
 
-carnivores <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_wolf_bear_masked_250716.tif"
-carnivores <- rast(carnivores)
-plot(carnivores)
+plot(M_CN_UA_binary)
 
 # Convert raster to data frame for ggplot
-df_carnivores <- as.data.frame(carnivores, xy = TRUE)
-names(df_carnivores)[3] <- "value"
+df_M_CN_UA_binary <- as.data.frame(M_CN_UA_binary, xy = TRUE)
+names(df_M_CN_UA_binary)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
-df_carnivores$value <- factor(df_carnivores$value, levels = c(0, 1))
+df_M_CN_UA_binary$value <- factor(df_M_CN_UA_binary$value, levels = c(0, 1))
 
 # Define colors
 carnivores_colors <- c(
@@ -1296,7 +1300,7 @@ carnivores_labels <- c(
 )
 
 # Plot with ggplot
-map_carnivores <- ggplot(df_carnivores, aes(x = x, y = y, fill = value)) +
+map_carnivores <- ggplot(df_M_CN_UA_binary, aes(x = x, y = y, fill = value)) +
   geom_tile() +
   scale_fill_manual(
     values = carnivores_colors,
@@ -1320,7 +1324,7 @@ map_carnivores <- ggplot(df_carnivores, aes(x = x, y = y, fill = value)) +
   labs(title = "Large carnivores current distribution without expansion in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_current_carnivores_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_current_carnivores_260324.png'),
   plot = map_carnivores,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1333,12 +1337,10 @@ Abandonment
 
 ```{r}
 
-abandonment <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_abandonment_masked_250716.tif"
-abandonment <- rast(abandonment)
-plot(abandonment)
+plot(abandonment_masked)
 
 # Convert raster to data frame for ggplot
-df_aband <- as.data.frame(abandonment, xy = TRUE)
+df_aband <- as.data.frame(abandonment_masked, xy = TRUE)
 names(df_aband)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
@@ -1380,7 +1382,7 @@ map_aband <- ggplot(df_aband, aes(x = x, y = y, fill = value)) +
   labs(title = "Areas potentially abandonned")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_aband_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_aband_260324.png'),
   plot = map_aband,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1391,12 +1393,10 @@ Species probable expansion
 
 ```{r}
 
-mammal_exp <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_P_SUM_threshold_masked_250716.tif"
-mammal_exp <- rast(mammal_exp)
-plot(mammal_exp)
+plot(P_SUM_threshold)
 
 # Convert raster to data frame for ggplot
-df_mam_exp <- as.data.frame(mammal_exp, xy = TRUE)
+df_mam_exp <- as.data.frame(P_SUM_threshold, xy = TRUE)
 names(df_mam_exp)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
@@ -1438,7 +1438,7 @@ map_mam_exp <- ggplot(df_mam_exp, aes(x = x, y = y, fill = value)) +
   labs(title = "Potential expansion of 8 mammal species")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_mam_exp_250916_2.png'),
+  file.path(output_dir, 'intermediary_map_mam_exp_260324.png'),
   plot = map_mam_exp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1449,12 +1449,10 @@ Carnivores probable expansion
 
 ```{r}
 
-carn_exp <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_P_CN_UA_threshold_masked_250716.tif"
-carn_exp <- rast(carn_exp)
-plot(carn_exp)
+plot(P_CN_UA_threshold)
 
 # Convert raster to data frame for ggplot
-df_carn_exp <- as.data.frame(carn_exp, xy = TRUE)
+df_carn_exp <- as.data.frame(P_CN_UA_threshold, xy = TRUE)
 names(df_carn_exp)[3] <- "value"
 
 # If it's binary (0/1), convert to factor
@@ -1496,7 +1494,7 @@ map_carn_exp <- ggplot(df_carn_exp, aes(x = x, y = y, fill = value)) +
   labs(title = "Potential expansion of Canis lupus lupus and Ursus arctos")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_carn_exp_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_carn_exp_260324.png'),
   plot = map_carn_exp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1509,16 +1507,14 @@ Carbon potential
 
 ```{r}
 
-carbon_pot <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_pot_carbon_masked_250716.tif"
-carbon_pot <- rast(carbon_pot)
-plot(carbon_pot)
+plot(pot_carbon_masked)
 
 # Step 1: Compute quantile breaks (10 bins)
-breaks_carbon <- quantile(values(carbon_pot), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+breaks_carbon <- quantile(values(pot_carbon_masked), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
 
 # Step 2: Classify into quantile bins (1–10)
 carbon_class <- classify(
-  carbon_pot,
+  pot_carbon_masked,
   rcl = matrix(c(
     breaks_carbon[1],  breaks_carbon[2],  1,
     breaks_carbon[2],  breaks_carbon[3],  2,
@@ -1562,7 +1558,7 @@ map_carbon <- ggplot(df_carbon, aes(x = x, y = y, fill = bin)) +
   labs(title = "Potential carbon storage (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_carbon_pot_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_carbon_pot_260324.png'),
   plot = map_carbon,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1573,16 +1569,14 @@ Climate velocity
 
 ```{r}
 
-cv <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_cv_masked_250716.tif"
-cv <- rast(cv)
-plot(cv)
+plot(cv_masked)
 
 # Step 1: Compute quantile breaks (10 bins)
-breaks_cv <- quantile(values(cv), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+breaks_cv <- quantile(values(cv_masked), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
 
 # Step 2: Classify into quantile bins (1–10)
 cv_class <- classify(
-  cv,
+  cv_masked,
   rcl = matrix(c(
     breaks_cv[1],  breaks_cv[2],  1,
     breaks_cv[2],  breaks_cv[3],  2,
@@ -1626,7 +1620,7 @@ map_cv <- ggplot(df_cv, aes(x = x, y = y, fill = bin)) +
   labs(title = "Climate velocity (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_cv_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_cv_260324.png'),
   plot = map_cv,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1637,10 +1631,6 @@ Number of people travelling
 
 ```{r}
 
-WTT_occ_proba_SB_stack <- "S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif"
-WTT_occ_proba_SB_stack <- rast(WTT_occ_proba_SB_stack)
-names(WTT_occ_proba_SB_stack)
-WTT_average = (WTT_occ_proba_SB_stack$WTT_LC + WTT_occ_proba_SB_stack$WTT_LH) / 2
 plot(WTT_average)
 
 # Step 1: Compute quantile breaks (10 bins)
@@ -1692,7 +1682,7 @@ map_WTT <- ggplot(df_WTT, aes(x = x, y = y, fill = bin)) +
   labs(title = "Number of people willing to travel (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_WTT_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_WTT_260304.png'),
   plot = map_WTT,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1703,16 +1693,14 @@ Livestock
 
 ```{r}
 
-livestock <- "I:/biocon/Magali_Weissgerber/wildE_framework_240912/Maps/Maps_review/250613/layers_maps_livestock_sum_no_pigs_masked_250716.tif"
-livestock <- rast(livestock)
-plot(livestock)
+plot(livestock_sum)
 
 # Step 1: Compute quantile breaks (10 bins)
-breaks_livestock <- quantile(values(livestock), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
+breaks_livestock <- quantile(values(livestock_sum), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
 
 # Step 2: Classify into quantile bins (1–10)
 livestock_class <- classify(
-  livestock,
+  livestock_sum,
   rcl = matrix(c(
     breaks_livestock[1],  breaks_livestock[2],  1,
     breaks_livestock[2],  breaks_livestock[3],  2,
@@ -1756,7 +1744,7 @@ map_livestock <- ggplot(df_livestock, aes(x = x, y = y, fill = bin)) +
   labs(title = "Livestock density (sheep, cow, goat, reindeer) (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_livestock_250916_1.png'),
+  file.path(output_dir, 'intermediary_map_livestock_260304.png'),
   plot = map_livestock,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1787,23 +1775,25 @@ pot_carbon_classified <- classify(pot_carbon_ceil, rcl = matrix(c(
 ), ncol = 3, byrow = TRUE))
 
 # Step 2: Mutually exclusive masks
-abandonment_mask <- ifel(aban_masked == 1, 1, 0)
+abandonment_mask <- ifel(abandonment_masked == 1, 1, 0)
 plot(abandonment_mask)
-hanpp_mask <- ifel((hanpp_T8_masked == 1) & (aban_masked != 1), 1, 0)
+hanpp_mask <- ifel((hanpp_masked == 1) & (abandonment_masked != 1), 1, 0)
 plot(hanpp_mask)
-residual_mask <- ifel((aban_masked != 1) & (hanpp_T8_masked != 1), 1, 0)
-plot(residual_mask)
+mitigation_residual_mask <- ifel((abandonment_masked != 1) & (hanpp_masked != 1), 1, 0)
+plot(mitigation_residual_mask)
 
 # Step 3: Offset and combine values by category
 abandonment_layer_mitigation <- ifel(abandonment_mask == 1, pot_carbon_classified + 10, NA)  # 11–20
+plot(abandonment_layer_mitigation)
 hanpp_layer <- ifel(hanpp_mask == 1, pot_carbon_classified + 20, NA)              # 21–30
-no_abandonment_layer <- ifel(residual_mask == 1, pot_carbon_classified, NA)       # 1–10
+plot(hanpp_layer)
+no_abandonment_layer <- ifel(mitigation_residual_mask == 1, pot_carbon_classified, NA)       # 1–10
+plot(no_abandonment_layer)
 
 # Step 4: Merge into a single raster
 pot_carbon_abandonment_combined <- merge(abandonment_layer_mitigation, hanpp_layer, no_abandonment_layer)
 par(mfrow = c(1,1))
 plot(pot_carbon_abandonment_combined)
-plot(abandonment_layer_mitigation)
 
 # Step 5: Convert to dataframe
 pot_carbon_abandonment_df <- as.data.frame(pot_carbon_abandonment_combined, xy = TRUE)
@@ -1858,16 +1848,7 @@ pot_carbon_abandonment_map <- ggplot() +
 # Step 9: Save map
 # png
 ggsave(
-  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_3.png'),
-  plot = pot_carbon_abandonment_map,
-  width = 26, height = 25, units = 'cm', dpi = 300
-)
-
-# svg (I tried to save it as svg so it would be easier to modify in inkscape but it's bugging and I am unsure it is really needed so I'll not do it for now)
-install.packages("svglite")
-library(svglite)
-ggsave(
-  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_1.svg'),
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_260324.png'),
   plot = pot_carbon_abandonment_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1884,12 +1865,12 @@ legend_df_pot_carbon <- legend_df_pot_carbon %>%
       category,
       "No abandonment" = "No future abandonment",
       "Abandonment" = "Probable future abandonment",
-      "HANPP" = "Current high naturalness"
+      "HANPP" = "Low land use intensity"
     ),
     color = case_when(
       category == "No future abandonment" ~ abandon_palette[base_level],
       category == "Probable future abandonment" ~ abandon_palette[base_level + 10],
-      category == "Current high naturalness" ~ abandon_palette[base_level + 20]
+      category == "Low land use intensity" ~ abandon_palette[base_level + 20]
     )
   )
 
@@ -1923,7 +1904,7 @@ pot_carbon_abandonment_legend <- ggplot(legend_df_pot_carbon, aes(x = base_level
 plot(pot_carbon_abandonment_legend)
 
 ggsave(
-  file.path(output_dir, 'pot_carbon_abandonment_hanpp_legend_3.png'),
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_legend_260324.png'),
   plot = pot_carbon_abandonment_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -1937,7 +1918,7 @@ final_plot_pot_carbon <- cowplot::plot_grid(
 
 # Step 12: Save final composite
 ggsave(
-  file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend_6_T8.png"),
+  file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend_260324.png"),
   plot = final_plot_pot_carbon,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -1968,19 +1949,18 @@ cv_classified <- classify(cv_ceil, rcl = matrix(c(
 ), ncol = 3, byrow = TRUE))
 
 # Step 2: Mutually exclusive masks
-abandonment_mask <- ifel(aban_masked == 1, 1, 0)
-meff_mask <- ifel((meff_T8_masked == 1) & (aban_masked != 1), 1, 0)
-residual_mask <- ifel((aban_masked != 1) & (meff_T8_masked != 1), 1, 0)
+abandonment_mask <- ifel(abandonment_masked == 1, 1, 0)
+meff_mask <- ifel((high_meff_masked == 1) & (abandonment_masked != 1), 1, 0)
+cv_residual_mask <- ifel((abandonment_masked != 1) & (high_meff_masked != 1), 1, 0)
 
 # Step 3: Offset and combine values by category
 abandonment_layer_adaptation <- ifel(abandonment_mask == 1, cv_classified + 10, NA)  # 11–20
 meff_layer <- ifel(meff_mask == 1, cv_classified + 20, NA)                # 21–30
-no_abandonment_layer <- ifel(residual_mask == 1, cv_classified, NA)       # 1–10
+no_abandonment_layer <- ifel(cv_residual_mask == 1, cv_classified, NA)       # 1–10
 
 # Step 4: Merge into a single raster
 cv_abandonment_combined <- merge(abandonment_layer_adaptation, meff_layer, no_abandonment_layer)
 plot(cv_abandonment_combined)
-plot(abandonment_layer_adaptation)
 
 # Step 5: Convert to dataframe
 cv_abandonment_df <- as.data.frame(cv_abandonment_combined, xy = TRUE)
@@ -2032,7 +2012,7 @@ cv_abandonment_map <- ggplot() +
 
 # Step 9: Save map
 ggsave(
-  file.path(output_dir, 'cv_abandonment_meff_map_1.png'),
+  file.path(output_dir, 'cv_abandonment_meff_map_260324.png'),
   plot = cv_abandonment_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2088,7 +2068,7 @@ cv_abandonment_legend <- ggplot(legend_df_cv, aes(x = base_level, y = category, 
 plot(cv_abandonment_legend)
 
 ggsave(
-  file.path(output_dir, 'cv_abandonment_meff_legend_1.png'),
+  file.path(output_dir, 'cv_abandonment_meff_legend_260324.png'),
   plot = cv_abandonment_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -2102,7 +2082,7 @@ final_plot_cv <- cowplot::plot_grid(
 
 # Step 12: Save final composite
 ggsave(
-  file.path(output_dir, "cv_abandonment_meff_map_with_legend_4_T8.png"),
+  file.path(output_dir, "cv_abandonment_meff_map_with_legend_260324.png"),
   plot = final_plot_cv,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -2117,12 +2097,12 @@ Social benefits (people travelling x (species current distribution and potential
 # Bivariate mapping: binary species expansion x 10 levels of people travelling
 
 # Step 0: remove overlap between current and proba
-M_sum_binary_sub <- M_sum_binary_masked - P_SUM_threshold_masked
+M_sum_binary_sub <- M_sum_binary - P_SUM_threshold
 M_sum_binary_sub <- ifel(M_sum_binary_sub == -1, 0, M_sum_binary_sub)
 plot(M_sum_binary_sub)
 
 # Step 1: Round NPP and classify into 10 quantiles
-WTT_ceil <- ceiling(WTT_average_masked)
+WTT_ceil <- ceiling(WTT_average)
 WTT_breaks <- quantile(values(WTT_ceil), probs = seq(0, 1, length.out = 11), na.rm = TRUE)
 
 WTT_classified <- classify(WTT_ceil, rcl = matrix(c(
@@ -2140,12 +2120,13 @@ WTT_classified <- classify(WTT_ceil, rcl = matrix(c(
 
 # Step 2: Combine species logic for binary mapping (exclusive values)
 # Prioritize M_SUM > P_SUM > No species
-WTT_M_sum <- ifel(M_sum_binary_sub == 1 & P_SUM_threshold_masked == 0, WTT_classified + 20, NA)
-WTT_P_sum <- ifel(P_SUM_threshold_masked == 1 & M_sum_binary_sub == 0, WTT_classified + 10, NA)
-WTT_no_species <- ifel(M_sum_binary_sub == 0 & P_SUM_threshold_masked == 0, WTT_classified, NA)
+WTT_M_sum <- ifel(M_sum_binary_sub == 1 & P_SUM_threshold == 0, WTT_classified + 20, NA)
+WTT_P_sum <- ifel(P_SUM_threshold == 1 & M_sum_binary_sub == 0, WTT_classified + 10, NA)
+WTT_no_species <- ifel(M_sum_binary_sub == 0 & P_SUM_threshold == 0, WTT_classified, NA)
 
 # Step 3: Combine using cover() to prioritize non-NA in order
 WTT_species_combined <- merge(WTT_no_species, WTT_P_sum, WTT_M_sum)
+plot(WTT_species_combined)
 
 # Step 4: Convert to dataframe
 WTT_species_df <- as.data.frame(WTT_species_combined, xy = TRUE)
@@ -2199,7 +2180,7 @@ WTT_species_map <- ggplot() +
  
 # Step C: Save
 ggsave(
-  file.path(output_dir, 'WTT_with_species_binary_map_2.png'),
+  file.path(output_dir, 'WTT_with_species_binary_map_260324.png'),
   plot = WTT_species_map,
   width = 26,
   height = 25,
@@ -2278,7 +2259,7 @@ WTT_species_legend <- ggplot(legend_df_WTT, aes(x = base_level, y = expansion, f
 plot(WTT_species_legend)
 
 ggsave(
-  file.path(output_dir, 'WTT_with_species_binary_legend_1.png'),
+  file.path(output_dir, 'WTT_with_species_binary_legend_260324.png'),
   plot = WTT_species_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -2286,23 +2267,22 @@ ggsave(
 ############ Combine map and legend
 
 # Combine the fixed legend with the map
-final_plot <- plot_grid(
+final_plot <- cowplot::plot_grid(
   WTT_species_map,
   WTT_species_legend,
-  ncol = 2
+  ncol = 1, 
+  rel_heights = c(5, 1)
 )
 
 # Optionally save
 ggsave(
-  file.path(output_dir, "WTT_with_species_binary_map_with_legend_borders_pruple_3levels_2.png"),
+  file.path(output_dir, "WTT_with_species_binary_map_with_legend_260324_2.png"),
   plot = final_plot,
   width = 40,
   height = 25,
   units = "cm",
   dpi = 300
 )
-
-
 
 ```
 
