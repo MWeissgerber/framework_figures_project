@@ -5,7 +5,7 @@ date: "2026-02-04"
 output: html_document
 ---
 
-## Loading libraries
+**Loading libraries**
 
 ```{r}
 
@@ -38,7 +38,7 @@ library(cowplot)
 
 ```
 
-## Prepare helpful necessary layers
+Prepare helpful necessary layers
 - A reference raster
 - A mask with Europe's borders
 - Preprocessed (masked) human population density raster
@@ -97,9 +97,9 @@ coastlines <- st_read("path")
 
 ```
 
-## I. Upload and prepare the data
+**I. Upload and prepare the data**
 
-# 1 Climate change mitigation
+**1 Climate change mitigation**
 
 Current = disturbance regime highly natural
 
@@ -234,7 +234,7 @@ cat("Total unrealised carbon stock in MgC due to abandonment:", round(total_unr_
 
 ```
 
-# 2 Climate change adaptation
+**2 Climate change adaptation**
 
 Current = high effectivement mesh size
 
@@ -293,9 +293,9 @@ plot(cv_masked)
 
 ```
 
-# 3 Social benefits and risk
+**3 Social benefits and risk**
 
-# 3.1 Determining the expansion probability of large mammals
+**3.1 Determining the expansion probability of large mammals**
 
 We are using the wildlife maps from the Rewild Europe Report (Fernández, N., Torres, A., Wolf, F., Quintero, L., & Pereira, H. M. (2020). Boosting Ecological Restoration for a Wilder Europe. Halle-Wittenberg: German Centre for Integrative Biodiversity Research (iDiv) and Martin-Luther-Universität.)
 
@@ -475,7 +475,7 @@ message("Processing summary:")
 print(results_status)
 ```
 
-# Next, import the distance raster
+Next, import the distance raster
 
 ```{r}
 # 1. List species names
@@ -570,7 +570,7 @@ plot(species_probability_stack_2)
 
 ```
 
-## 3.2 - determining social benefit
+**3.2 - determining social benefit**
 
 We look at people's willingness-To-Travel (WTT) to see wildlife.
 WTT is distributed among people, we use this distribution to determine the relation between distance to a cell and the share of people in the surrounding cells that will travel. Use the complementary lognormal CDF function (1 - CDF) and the density of people in a convolution to determine the amount of people going to one cell.
@@ -900,7 +900,7 @@ plot(P_SUM_threshold, main = "Binary probability (>0.5 = 1)")
 
 ```
 
-## 3.3 - Determining social conflict
+**3.3 - Determining social conflict**
 
 Import livestock distribution data
 
@@ -1075,7 +1075,7 @@ plot(M_CN_UA_binary)
 
 ```
 
-## 3.4: Export and import each layer so there is no need to process all the data each time
+**3.4: Export and import each layer so there is no need to process all the data each time**
 
 ```{r}
 
@@ -1125,9 +1125,9 @@ P_CN_UA_threshold <- rast(file.path(output_dir, "layers_maps_P_CN_UA_threshold.t
 
 ```
 
-## II. map each data individually (to prepare the figure in supplementary materials)
+**II. map each data individually (to prepare the figure in supplementary materials)**
 
-# 1. Current
+**1. Current**
 
 Low land use intensity = natural disturbance regime
 
@@ -1355,7 +1355,7 @@ ggsave(
 
 ```
 
-# 2. Potential
+**2. Potential**
 
 Abandonment
 
@@ -1525,7 +1525,7 @@ ggsave(
 
 ```
 
-# 3. Benefits / proxy of outcome (quantiles)
+**3. Benefits / proxy of outcome (quantiles)**
 
 Carbon potential
 
@@ -1775,7 +1775,7 @@ ggsave(
 
 ```
 
-## III. produce the bivariate maps
+**III. produce the bivariate maps**
 
 Climate change mitigation (potential carbon x (abandonment and low land use intensity))
 
@@ -2496,9 +2496,9 @@ ggsave(
 
 ```
 
-## IV. Vizualising overlap of the four benefits (top 80% of each)
+**IV. Vizualising overlap of the four benefits (top 80% of each)**
 
-# 1. Determining when benefits overlap
+**1. Determining when benefits overlap**
 
 Get the top 80% of each benefits
 
@@ -3038,7 +3038,7 @@ ggsave(
 
 ```
 
-# 2. Determining benefits extent: distinguishing overlapping extent and exclusive extent 
+**2. Determining benefits extent: distinguishing overlapping extent and exclusive extent** 
 
 Climate change mitigation
 
