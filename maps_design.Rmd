@@ -51,8 +51,8 @@ library(cowplot)
 
 # Import population raster not distinguishing inland (should be 0) and oceans (should be NA)
 # Step 1: Load the population raster and coastline shapefile
-raster_1km_human_population_path <- "S:/Magali_Weissgerber/human_population_scratch/JRC_1K_POP_2018.tif" # Read the 1km resolution raster
-raster_1km_human_population <- rast(raster_1km_human_population_path)
+raster_1km_human_population_path <- "path" # Read the 1km resolution raster
+raster_1km_human_population <- terra::rast(raster_1km_human_population_path)
 plot(raster_1km_human_population)
 
 # It is not distinguishing different type of absence of popupation: inland (should be 0) and oceans (should be NA)
@@ -60,7 +60,7 @@ plot(raster_1km_human_population)
 
 # Step 2: Load coastline shapefile
 # Import Europe's borders (download here #### this one we can put online ####)
-inland_shapefile <- st_read("S:/Magali_Weissgerber/Europe frontiers_scratch/NUT3_from_rewilding_folder/Europe_limit_from_nut3_dissolve.shp")
+inland_shapefile <- st_read("path")
 plot(inland_shapefile)
 
 # Step 3: check the objects
@@ -92,8 +92,8 @@ raster_1km_human_population <- population_preprocessed
 ref_raster <- raster_1km_human_population
 
 #Prepare also country borders and coastlines for mapping
-country_borders <- st_read("I:/biocon/Projects/RewildingMAP/DataSources/ReferenceData/ref-countries-2016-01m/CNTR_BN_01M_2016_3035_INLAND/CNTR_BN_01M_2016_3035_INLAND.shp")
-coastlines <- st_read("I:/biocon/Projects/RewildingMAP/DataSources/Europe_coastline_shapefile/Europe_coastline.shp")
+country_borders <- st_read("path")
+coastlines <- st_read("path")
 
 ```
 
@@ -108,9 +108,9 @@ Current = disturbance regime highly natural
 # Intensity of use with threshold
 
 # Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
-hanpp_path <- "I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/hanpp2006gapfilled2000_1k/hanpp06gapf00intNodata.tif"
+hanpp_path <- "path"
 # Load the raster
-hanpp_raster <- rast(hanpp_path)
+hanpp_raster <- terra::rast(hanpp_path)
 # Plot to check
 plot(hanpp_raster, main = "HANPP 2006 Gapfilled (1km)")
 # Invert and re-scale (100 - value) / 100 (we want high values to indicate natural areas and the % to be between 0 and 1)
@@ -140,7 +140,7 @@ Potential = abandonment
 
 # Abandonment
 
-abandon <- terra::rast('I:\\biocon\\Magali_Weissgerber\\wildE_framework_240912\\Maps\\20250106_lq\\data\\rewilding.tif')
+abandon <- terra::rast('path')
 # (1 = 1 scenario of abandonment is happening, 4 = four scenarios of abandonment are happening)
 plot(abandon)
 # Classify abandonment to present/absent
@@ -177,7 +177,7 @@ Benefits = potential carbons stock
 
 # Potential carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
 
-pot_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Pot_AGB_BGB_SOC_MgCha_500m.tif')
+pot_carbon <- terra::rast("path")
 crs(pot_carbon) == crs(ref_raster)             # Coordinate system
 res(pot_carbon) == res(ref_raster)             # Resolution
 ext(pot_carbon) == ext(ref_raster)             # Extent
@@ -188,12 +188,12 @@ plot(pot_carbon_masked)
 
 ```
 
-Calculation of the mass of carbon that could be stored in areas potentially abandoned (this calculation is independant from the maps)
+Calculation of the mass (stock) of carbon that could be stored in areas potentially abandoned (this calculation is independent from the maps)
 
 ```{r}
 
 ## Import unrealized carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
-unr_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Unr_AGB_BGB_SOC_MgCha_500m.tif')
+unr_carbon <- terra::rast("path")
 crs(unr_carbon) == crs(ref_raster)             # Coordinate system
 res(unr_carbon) == res(ref_raster)             # Resolution
 ext(unr_carbon) == ext(ref_raster)             # Extent
@@ -245,7 +245,7 @@ Current = high effectivement mesh size
 # Load the file
 # Define import directory
 # Define the directory path
-directory_anth_meff <- "I:\\biocon\\Emmanuel_Oceguera\\projects\\2025_10_WildE_fragmentation_magali\\fragmentation\\ESACCI_LULC\\output\\natural_areas\\10km_radius"
+directory_anth_meff <- "path"
 # List files for 2022 with .tif or .tiff extension
 meff_2022_file <- list.files(
   path = directory_anth_meff,
@@ -278,7 +278,7 @@ Benefits = climate velocity
 
 # Climate velocity
 
-cv <- terra::rast('S:\\Magali_Weissgerber\\Climate velocity\\CV_data_cropped_to_europe.tif')
+cv <- terra::rast("path")
 plot(cv)
 crs(cv) == crs(ref_raster)             # Coordinate system
 res(cv) == res(ref_raster)             # Resolution
@@ -906,19 +906,19 @@ Import livestock distribution data
 
 ```{r}
 
-# Get the total of cow, sheep, goat and pig per cell
+# Get the total of cow, sheep, and goat per cell
 
 # Import data
 
-cow_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/COWS/5_Ct_2015_Da.tif"
+cow_population_path <- "path"
 cow_population <- rast(cow_population_path)
 plot(cow_population)
 
-goat_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/GOATS/5_Gt_2015_Da.tif"
+goat_population_path <- "path"
 goat_population <- rast(goat_population_path)
 plot(goat_population)
 
-sheep_population_path <- "I:/biocon/Gavin Stark/livestock and farmers maps/SHEEPS/5_Sh_2015_Da.tif"
+sheep_population_path <- "path"
 sheep_population <- rast(sheep_population_path)
 plot(sheep_population)
 
@@ -961,10 +961,10 @@ Source: Moen, J., Forbes, B. C., Löf, A., & Horstkotte, T. (2022). Tipping poin
 ```{r}
 
 # 1. Load herding polygon and inland raster
-herding_poly <- vect("S:/Magali_Weissgerber/Livestock for social conflict of rewilding/Reindeer/reindeer_polygon_250618.shp")
+herding_poly <- vect("path")
 plot(herding_poly)
 plot(inland_raster)
-countries <- vect("I:/biocon/Projects/RewildingMAP/Consolidated/BASE_LAYERS/CountriesPanEURno500isl.shp")
+countries <- vect("path")
 plot(countries)
 
 # 2. Reproject vector data to match inland_raster
@@ -1079,49 +1079,49 @@ plot(M_CN_UA_binary)
 
 ```{r}
 
-output_dir = "S:/Magali_Weissgerber/Data_framework_verifying_260324"
+output_dir = "path"
 
 # Climate change mitigation
   
-writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_hanpp_masked_260324.tif"), overwrite = TRUE)
-hanpp_masked <- rast(file.path(output_dir, "layers_maps_hanpp_masked_260324.tif"))
+writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_hanpp_masked.tif"), overwrite = TRUE)
+hanpp_masked <- rast(file.path(output_dir, "layers_maps_hanpp_masked4.tif"))
 
-writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked_260324.tif"), overwrite = TRUE)
-abandonment_masked <- rast(file.path(output_dir, "layers_maps_abandonment_masked_260324.tif"))
+writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked.tif"), overwrite = TRUE)
+abandonment_masked <- rast(file.path(output_dir, "layers_maps_abandonment_masked.tif"))
 
-writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked_260324.tif"), overwrite = TRUE)
-pot_carbon_masked <- rast(file.path(output_dir, "layers_maps_pot_carbon_masked_260324.tif"))
+writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked.tif"), overwrite = TRUE)
+pot_carbon_masked <- rast(file.path(output_dir, "layers_maps_pot_carbon_masked4.tif"))
 
 # Climate change adaptation
 
-writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_high_meff_masked_260324.tif"), overwrite = TRUE)
-high_meff_masked <- rast(file.path(output_dir, "layers_maps_high_meff_masked_260324.tif"))
+writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_high_meff_masked.tif"), overwrite = TRUE)
+high_meff_masked <- rast(file.path(output_dir, "layers_maps_high_meff_masked.tif"))
 
-writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked_260324.tif"), overwrite = TRUE)
-cv_masked <- rast(file.path(output_dir, "layers_maps_cv_masked_260324.tif"))
+writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked.tif"), overwrite = TRUE)
+cv_masked <- rast(file.path(output_dir, "layers_maps_cv_masked.tif"))
 
 # Social benefits
 
-writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_WTT_average_260324.tif"), overwrite = TRUE)
-WTT_average <- rast(file.path(output_dir, "layers_maps_WTT_average_260324.tif"))
+writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_WTT_average.tif"), overwrite = TRUE)
+WTT_average <- rast(file.path(output_dir, "layers_maps_WTT_average.tif"))
 
-writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_M_sum_binary_260324.tif"), overwrite = TRUE)
-M_sum_binary <- rast(file.path(output_dir, "layers_maps_M_sum_binary_260324.tif"))
+writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_M_sum_binary.tif"), overwrite = TRUE)
+M_sum_binary <- rast(file.path(output_dir, "layers_maps_M_sum_binary.tif"))
 
 writeRaster(P_SUM_threshold, filename = file.path(output_dir, "layers_maps_P_SUM_threshold_260324.tif"), overwrite = TRUE)
-P_SUM_threshold <- rast(file.path(output_dir, "layers_maps_P_SUM_threshold_260324.tif"))
+P_SUM_threshold <- rast(file.path(output_dir, "layers_maps_P_SUM_threshold.tif"))
 
 # Social Conflict
 
 livestock_sum <- conflict_raster_stack_complete$livestock_sum
-writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_livestock_sum_260324.tif"), overwrite = TRUE)
-livestock_sum <- rast(file.path(output_dir, "layers_maps_livestock_sum_260324.tif"))
+writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_livestock_sum.tif"), overwrite = TRUE)
+livestock_sum <- rast(file.path(output_dir, "layers_maps_livestock_sum.tif"))
 
-writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_M_CN_UA_binary_260324.tif"), overwrite = TRUE)
-M_CN_UA_binary <- rast(file.path(output_dir, "layers_maps_M_CN_UA_binary_260324.tif"))
+writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_M_CN_UA_binary.tif"), overwrite = TRUE)
+M_CN_UA_binary <- rast(file.path(output_dir, "layers_maps_M_CN_UA_binary.tif"))
 
 writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_P_CN_UA_threshold_260324.tif"), overwrite = TRUE)
-P_CN_UA_threshold <- rast(file.path(output_dir, "layers_maps_P_CN_UA_threshold_260324.tif"))
+P_CN_UA_threshold <- rast(file.path(output_dir, "layers_maps_P_CN_UA_threshold.tif"))
 
 ```
 
@@ -1178,7 +1178,7 @@ map_hanpp <- ggplot(df_hanpp, aes(x = x, y = y, fill = value)) +
   labs(title = "High naturalness in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_intensity_260324.png'),
+  file.path(output_dir, 'intermediary_map_intensity.png'),
   plot = map_hanpp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1234,7 +1234,7 @@ map_meff <- ggplot(df_meff, aes(x = x, y = y, fill = value)) +
   labs(title = "High effective mesh size in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_meff_260324.png'),
+  file.path(output_dir, 'intermediary_map_meff.png'),
   plot = map_meff,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1291,7 +1291,7 @@ map_species_current <- ggplot(df_M_sum_binary, aes(x = x, y = y, fill = value)) 
   labs(title = "Large mammals current distribution without expansion in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_M_sum_binary_260324.png'),
+  file.path(output_dir, 'intermediary_map_M_sum_binary.png'),
   plot = map_species_current,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1348,7 +1348,7 @@ map_carnivores <- ggplot(df_M_CN_UA_binary, aes(x = x, y = y, fill = value)) +
   labs(title = "Large carnivores current distribution without expansion in Europe")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_current_carnivores_260324.png'),
+  file.path(output_dir, 'intermediary_map_current_carnivores.png'),
   plot = map_carnivores,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1406,7 +1406,7 @@ map_aband <- ggplot(df_aband, aes(x = x, y = y, fill = value)) +
   labs(title = "Areas potentially abandonned")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_aband_260324.png'),
+  file.path(output_dir, 'intermediary_map_aband.png'),
   plot = map_aband,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1462,7 +1462,7 @@ map_mam_exp <- ggplot(df_mam_exp, aes(x = x, y = y, fill = value)) +
   labs(title = "Potential expansion of 8 mammal species")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_mam_exp_260324.png'),
+  file.path(output_dir, 'intermediary_map_mam_exp.png'),
   plot = map_mam_exp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1518,7 +1518,7 @@ map_carn_exp <- ggplot(df_carn_exp, aes(x = x, y = y, fill = value)) +
   labs(title = "Potential expansion of Canis lupus lupus and Ursus arctos")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_carn_exp_260324.png'),
+  file.path(output_dir, 'intermediary_map_carn_exp.png'),
   plot = map_carn_exp,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1582,7 +1582,7 @@ map_carbon <- ggplot(df_carbon, aes(x = x, y = y, fill = bin)) +
   labs(title = "Potential carbon storage (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_carbon_pot_260324.png'),
+  file.path(output_dir, 'intermediary_map_carbon_pot.png'),
   plot = map_carbon,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1644,7 +1644,7 @@ map_cv <- ggplot(df_cv, aes(x = x, y = y, fill = bin)) +
   labs(title = "Climate velocity (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_cv_260324.png'),
+  file.path(output_dir, 'intermediary_map_cv.png'),
   plot = map_cv,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1706,7 +1706,7 @@ map_WTT <- ggplot(df_WTT, aes(x = x, y = y, fill = bin)) +
   labs(title = "Number of people willing to travel (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_WTT_260304.png'),
+  file.path(output_dir, 'intermediary_map_WTT.png'),
   plot = map_WTT,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1768,7 +1768,7 @@ map_livestock <- ggplot(df_livestock, aes(x = x, y = y, fill = bin)) +
   labs(title = "Livestock density (sheep, cow, goat, reindeer) (10-quantile map)")
 
 ggsave(
-  file.path(output_dir, 'intermediary_map_livestock_260304.png'),
+  file.path(output_dir, 'intermediary_map_livestock.png'),
   plot = map_livestock,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1872,7 +1872,7 @@ pot_carbon_abandonment_map <- ggplot() +
 # Step 9: Save map
 # png
 ggsave(
-  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map_260324.png'),
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_map.png'),
   plot = pot_carbon_abandonment_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -1930,7 +1930,7 @@ pot_carbon_abandonment_legend <- ggplot(legend_df_pot_carbon, aes(x = base_level
 plot(pot_carbon_abandonment_legend)
 
 ggsave(
-  file.path(output_dir, 'pot_carbon_abandonment_hanpp_legend_260324.png'),
+  file.path(output_dir, 'pot_carbon_abandonment_hanpp_legend.png'),
   plot = pot_carbon_abandonment_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -1948,7 +1948,7 @@ final_plot_pot_carbon <- cowplot::plot_grid(
 
 # Save final composite
 ggsave(
-  file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend_260324.png"),
+  file.path(output_dir, "pot_carbon_abandonment_hanpp_map_with_legend.png"),
   plot = final_plot_pot_carbon,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -2042,7 +2042,7 @@ cv_abandonment_map <- ggplot() +
 
 # Step 9: Save map
 ggsave(
-  file.path(output_dir, 'cv_abandonment_meff_map_260324.png'),
+  file.path(output_dir, 'cv_abandonment_meff_map.png'),
   plot = cv_abandonment_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2100,7 +2100,7 @@ cv_abandonment_legend <- ggplot(legend_df_cv, aes(x = base_level, y = category, 
 plot(cv_abandonment_legend)
 
 ggsave(
-  file.path(output_dir, 'cv_abandonment_meff_legend_260324.png'),
+  file.path(output_dir, 'cv_abandonment_meff_legend.png'),
   plot = cv_abandonment_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -2118,7 +2118,7 @@ final_plot_cv <- cowplot::plot_grid(
 
 # Save final composite
 ggsave(
-  file.path(output_dir, "cv_abandonment_meff_map_with_legend_260324.png"),
+  file.path(output_dir, "cv_abandonment_meff_map_with_legend.png"),
   plot = final_plot_cv,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -2216,7 +2216,7 @@ WTT_species_map <- ggplot() +
  
 # Step 8: Save
 ggsave(
-  file.path(output_dir, 'WTT_with_species_binary_map_260324.png'),
+  file.path(output_dir, 'WTT_with_species_binary_map.png'),
   plot = WTT_species_map,
   width = 26,
   height = 25,
@@ -2295,7 +2295,7 @@ WTT_species_legend <- ggplot(legend_df_WTT, aes(x = base_level, y = expansion, f
 plot(WTT_species_legend)
 
 ggsave(
-  file.path(output_dir, 'WTT_with_species_binary_legend_260324.png'),
+  file.path(output_dir, 'WTT_with_species_binary_legend.png'),
   plot = WTT_species_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -2314,7 +2314,7 @@ final_plot <- cowplot::plot_grid(
 
 # Save
 ggsave(
-  file.path(output_dir, "WTT_with_species_binary_map_with_legend_260324_2.png"),
+  file.path(output_dir, "WTT_with_species_binary_map_with_legend.png"),
   plot = final_plot,
   width = 40,
   height = 25,
@@ -2412,7 +2412,7 @@ livestock_map <- ggplot() +
 # Step 9: Save
 
 ggsave(
-  file.path(output_dir, 'livestock_wolf_bear_species_map_260324.png'),
+  file.path(output_dir, 'livestock_wolf_bear_species_map.png'),
   plot = livestock_map,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2475,7 +2475,7 @@ plot(livestock_legend)
 
 # Step 14: Save
 ggsave(
-  file.path(output_dir, 'livestock_wolf_bear_species_legend_260324.png'),
+  file.path(output_dir, 'livestock_wolf_bear_species_legend.png'),
   plot = livestock_legend,
   width = 24, height = 10, units = 'cm', dpi = 300
 )
@@ -2489,7 +2489,7 @@ final_plot <- plot_grid(livestock_map, livestock_legend, ncol = 2)
 
 # Save combined
 ggsave(
-  file.path(output_dir, "livestock_wolf_bear_species_map_with_legend_260324.png"),
+  file.path(output_dir, "livestock_wolf_bear_species_map_with_legend.png"),
   plot = final_plot,
   width = 40, height = 25, units = "cm", dpi = 300
 )
@@ -2527,7 +2527,7 @@ plot(wtt_top80_stack)
 plot(livestock_top80_stack)
 
 # Export to the correct output directory
-writeRaster(top80_stacks, filename = file.path(output_dir, "rewilding_opportunity_top80_260324.tif"), overwrite = TRUE)
+writeRaster(top80_stacks, filename = file.path(output_dir, "rewilding_opportunity_top80.tif"), overwrite = TRUE)
 
 # NPP Top 80%
 png(file.path(output_dir, "carbon_top80_map.png"), width = 800, height = 800, res = 150)
@@ -2595,7 +2595,7 @@ names(exclusive_stack80) <- c("carbon_only80", "cv_only80", "wtt_only80", "lives
 
 # Plot or export
 plot(exclusive_stack80)
-writeRaster(exclusive_stack80, filename = file.path(output_dir, "exclusive_overlap_stack80_260324.tif"), overwrite = TRUE)
+writeRaster(exclusive_stack80, filename = file.path(output_dir, "exclusive_overlap_stack80.tif"), overwrite = TRUE)
 
 ```
 
@@ -2665,14 +2665,14 @@ map_opportunities_one <- ggplot(map_df, aes(x = x, y = y, fill = factor(category
   geom_sf(data = country_borders, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
 geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes = FALSE) +
   coord_sf(
-    xlim = c(2635973, 6525973),  # adapte les limites si nécessaire
+    xlim = c(2635973, 6525973), 
     ylim = c(1448659, 5415659),
     expand = FALSE
   ) +
   theme_minimal()
 
 ggsave(
-  file.path(output_dir, 'no_overlap_stack80_260324.png'),
+  file.path(output_dir, 'no_overlap_stack80.png'),
   plot = map_opportunities_one,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2782,7 +2782,7 @@ geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes =
   theme_minimal()
 
 ggsave(
-  file.path(output_dir, 'two_overlap_stack80_260324.png'),
+  file.path(output_dir, 'two_overlap_stack80.png'),
   plot = map_opportunities_two,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2885,7 +2885,7 @@ geom_sf(data = coastlines, fill = NA, color = "black", size = 0.2, inherit.aes =
   theme_minimal()
 
 ggsave(
-  file.path(output_dir, 'three_overlap_stack80_260324.png'),
+  file.path(output_dir, 'three_overlap_stack80.png'),
   plot = map_opportunities_three,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -2953,7 +2953,7 @@ map_opportunities_four <- ggplot(map_df, aes(x = x, y = y, fill = factor(categor
   theme_minimal()
 
 ggsave(
-  file.path(output_dir, 'four_overlap_stack80_260324.png'),
+  file.path(output_dir, 'four_overlap_stack80.png'),
   plot = map_opportunities_four,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3031,7 +3031,7 @@ map_opportunities_number <- ggplot(map_df_final, aes(x = x, y = y, fill = factor
   theme_minimal()
 
 ggsave(
-  file.path(output_dir, 'number_of_overlap_stack80_260324.png'),
+  file.path(output_dir, 'number_of_overlap_stack80.png'),
   plot = map_opportunities_number,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3102,7 +3102,7 @@ map_combined_carbon <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   labs(title = "Climate change mitigation opportunity (top 80%)")
 
 ggsave(
-  file.path(output_dir, 'opportunities80_mitigation_260327.png'),
+  file.path(output_dir, 'opportunities80_mitigation.png'),
   plot = map_combined_carbon,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3170,7 +3170,7 @@ map_combined_cv <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   labs(title = "Climate change adaptation opportunity (top 80%)")
 
 ggsave(
-  file.path(output_dir, 'opportunities80_adaptation_260327.png'),
+  file.path(output_dir, 'opportunities80_adaptation.png'),
   plot = map_combined_cv,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3238,7 +3238,7 @@ map_combined_wtt <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   labs(title = "Ecotourism opportunity (top 80%)")
 
 ggsave(
-  file.path(output_dir, 'opportunities80_wtt_260327.png'),
+  file.path(output_dir, 'opportunities80_wtt.png'),
   plot = map_combined_wtt,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3307,7 +3307,7 @@ map_combined_livestock <- ggplot(df_combined, aes(x = x, y = y, fill = category)
   labs(title = "Low livestock-wildlife conflict opportunity (top 80%)")
 
 ggsave(
-  file.path(output_dir, 'opportunities80_livestock_260327.png'),
+  file.path(output_dir, 'opportunities80_livestock.png'),
   plot = map_combined_livestock,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
