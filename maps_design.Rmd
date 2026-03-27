@@ -3002,11 +3002,11 @@ Climate change mitigation
 # Whole extent
 plot(carbon80)
 # Extent alone
-plot(exclusive_stack80$carbon_only_r80)
+plot(exclusive_stack80$carbon_only80)
 
 # Step 1: Reclassify rasters into 0/1
 r_whole <- carbon80
-r_excl  <- exclusive_stack80$carbon_only_r80
+r_excl  <- exclusive_stack80$carbon_only80
 
 # Step 2: Combine with priority to exclusive
 # Start with whole extent
@@ -3055,10 +3055,8 @@ map_combined_carbon <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   ) +
   labs(title = "Climate change mitigation opportunity (top 80%)")
 
-plot(map_combined_carbon)
-
 ggsave(
-  file.path(output_dir, 'opportunities80_mitigation_3.png'),
+  file.path(output_dir, 'opportunities80_mitigation_260327.png'),
   plot = map_combined_carbon,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3125,14 +3123,11 @@ map_combined_cv <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   ) +
   labs(title = "Climate change adaptation opportunity (top 80%)")
 
-plot(map_combined_cv)
-
 ggsave(
-  file.path(output_dir, 'opportunities80_adaptation_3.png'),
+  file.path(output_dir, 'opportunities80_adaptation_260327.png'),
   plot = map_combined_cv,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
-
 
 ```
 
@@ -3196,10 +3191,8 @@ map_combined_wtt <- ggplot(df_combined, aes(x = x, y = y, fill = category)) +
   ) +
   labs(title = "Ecotourism opportunity (top 80%)")
 
-plot(map_combined_wtt)
-
 ggsave(
-  file.path(output_dir, 'opportunities80_wtt_2.png'),
+  file.path(output_dir, 'opportunities80_wtt_260327.png'),
   plot = map_combined_wtt,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
@@ -3267,10 +3260,8 @@ map_combined_livestock <- ggplot(df_combined, aes(x = x, y = y, fill = category)
   ) +
   labs(title = "Low livestock-wildlife conflict opportunity (top 80%)")
 
-plot(map_combined_livestock)
-
 ggsave(
-  file.path(output_dir, 'opportunities80_livestock_2.png'),
+  file.path(output_dir, 'opportunities80_livestock_260327.png'),
   plot = map_combined_livestock,
   width = 26, height = 25, units = 'cm', dpi = 300
 )
