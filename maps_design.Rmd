@@ -188,6 +188,52 @@ plot(pot_carbon_masked)
 
 ```
 
+Calculation of the mass of carbon that could be stored in areas potentially abandoned (this calculation is independant from the maps)
+
+```{r}
+
+## Import unrealized carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
+unr_carbon <- terra::rast('S:\\Magali_Weissgerber\\HANPP_scratch\\Unrealised_carbon_stock_Walker2022\\Base_Unr_AGB_BGB_SOC_MgCha_500m.tif')
+crs(unr_carbon) == crs(ref_raster)             # Coordinate system
+res(unr_carbon) == res(ref_raster)             # Resolution
+ext(unr_carbon) == ext(ref_raster)             # Extent
+unr_carbon_proj <- project(unr_carbon, ref_raster)
+crs(unr_carbon_proj) == crs(ref_raster)             # Coordinate system
+res(unr_carbon_proj) == res(ref_raster)             # Resolution
+ext(unr_carbon_proj) == ext(ref_raster)             # Extent
+
+## Sum unrealized carbon (MgC/ha) where there is abandonment
+
+# 1. Mask unrealized carbon to keep only where abandonment is present (i.e. value == 1)
+compareGeom(unr_carbon_proj, abandonment_masked)
+carbon_in_abandon <- ifel(
+  is.na(abandonment_masked),
+  NA,
+  ifel(abandonment_masked == 1, unr_carbon_proj, 0)
+)
+plot(carbon_in_abandon)
+
+# 2. Resolution of the projected raster (likely in meters)
+px_area_ha <- cellSize(carbon_in_abandon, unit = "ha")
+# Compute pixel area (ha) for each cell.
+# Required to convert carbon density (MgC/ha) to total stock (MgC).
+# Uses geodesic area, so it is accurate even for geographic (lon/lat) rasters.
+
+# 3. Multiply pixel-wise to get total carbon stock in MgC
+unr_carbon_stock <- carbon_in_abandon * px_area_ha  # MgC/ha × ha = MgC
+plot(unr_carbon_stock)
+
+# 4. Sum total stock
+total_unr_carbon_abandon <- global(unr_carbon_stock, fun = "sum", na.rm = TRUE)[1, 1]
+
+# 5. Sum total stock in PgC
+total_unr_carbon_abandon_PgC <- total_unr_carbon_abandon / 1e9
+
+# Print result
+cat("Total unrealised carbon stock in MgC due to abandonment:", round(total_unr_carbon_abandon), "\n")
+
+```
+
 # 2 Climate change adaptation
 
 Current = high effectivement mesh size
@@ -3200,7 +3246,7 @@ ggsave(
 
 ```
 
-Sociale conflicts
+Social conflicts
 
 ```{r}
 
