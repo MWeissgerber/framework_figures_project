@@ -3,6 +3,9 @@ title: "maps_design"
 author: "Magali Weissgerber"
 date: "2026-02-04"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 **Loading libraries**
@@ -28,6 +31,9 @@ library(ravetools)
 install.packages('dplyr') # Provides functions for common data manipulation tasks such as filtering, selecting, and summarizing data.
 library(dplyr)
 
+install.packages('raster') # Provides functions to read, write, manipulate, and analyze raster (grid-based) spatial data.
+library(raster)
+
 # For plotting
 
 install.packages('ggplot2') # Used to create data visualizations using the grammar of graphics framework.
@@ -38,29 +44,55 @@ library(cowplot)
 
 ```
 
-Prepare helpful necessary layers
-- A reference raster
-- A mask with Europe's borders
-- Preprocessed (masked) human population density raster
-- Europe borders and coastlines
+**Prepare reference raster and masks**
+
+# All input data are stored in the `data/raw` folder.
+# Intermediate processed data can be stored in `data/intermediate`.
+# Final outputs (e.g. figures, tables) are saved in the `output` folder.
+# All data are available from Zenodo (see README for details).
 
 ```{r}
 
-# We use a raster of human population density, it can be downloaded here https://ec.europa.eu/eurostat/web/gisco/geodata/population-distribution/population-grids
-# We use it as a reference raster for resolution, crs, and extent
+# Define base directories
+data_raw_dir <- "data/raw"
+data_int_dir <- "data/intermediate"
+output_dir   <- "output"
+
+# Create directories if they do not exist
+dir.create(data_raw_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(data_int_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+```
+
+Prepare helpful necessary layers - A reference raster - A mask with
+Europe's borders - Preprocessed (masked) human population density
+raster - Europe borders and coastlines
+
+```{r}
 
 # Import population raster not distinguishing inland (should be 0) and oceans (should be NA)
 # Step 1: Load the population raster and coastline shapefile
-raster_1km_human_population_path <- "path" # Read the 1km resolution raster
+raster_1km_human_population_path <- file.path(
+  data_raw_dir,
+  "Human_population_density",
+  "JRC_1K_POP_2018.tif"
+)
+# Read the 1km resolution raster
 raster_1km_human_population <- terra::rast(raster_1km_human_population_path)
 plot(raster_1km_human_population)
 
-# It is not distinguishing different type of absence of popupation: inland (should be 0) and oceans (should be NA)
+# It is not distinguishing different type of absence of population: inland (should be 0) and oceans (should be NA)
 # So we are using a file with the coastlines to make this disctinction
 
 # Step 2: Load coastline shapefile
-# Import Europe's borders (download here #### this one we can put online ####)
-inland_shapefile <- st_read("path")
+# Import Europe's borders
+inland_shapefile_path <- file.path(
+  data_raw_dir,
+  "Europe_inland",
+  "europe_limit_from_nut3_dissolve.shp"
+)
+inland_shapefile <- st_read(inland_shapefile_path)
 plot(inland_shapefile)
 
 # Step 3: check the objects
@@ -91,9 +123,23 @@ raster_1km_human_population <- population_preprocessed
 #Define the reference raster
 ref_raster <- raster_1km_human_population
 
-#Prepare also country borders and coastlines for mapping
-country_borders <- st_read("path")
-coastlines <- st_read("path")
+#Load vector layers for map visualization (country borders and coastlines)
+
+country_borders_path <- file.path(
+  data_raw_dir,
+  "Country_borders",
+  "CNTR_BN_01M_2016_3035_INLAND.shp"
+)
+country_borders_shapefile <- st_read(country_borders_path)
+plot(country_borders_shapefile)
+
+coastlines_path <- file.path(
+  data_raw_dir,
+  "Coastlines",
+  "Europe_coastline.shp"
+)
+coastlines_shapefile <- st_read(coastlines_path)
+plot(coastlines_shapefile)
 
 ```
 
@@ -108,7 +154,11 @@ Current = disturbance regime highly natural
 # Intensity of use with threshold
 
 # Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
-hanpp_path <- "path"
+hanpp_path <- file.path(
+  data_raw_dir,
+  "HANPP",
+  "hanpp06gapf00.tif"
+)
 # Load the raster
 hanpp_raster <- terra::rast(hanpp_path)
 # Plot to check
@@ -140,9 +190,16 @@ Potential = abandonment
 
 # Abandonment
 
-abandon <- terra::rast('path')
+# Path to the abandonment raster (Ceausu et al. 2015)
+abandonment_path <- file.path(
+  data_raw_dir,
+  "Abandonment",
+  "abandonment_scenarios_Ceausu_2015.tif"
+)
+# Load the raster
+abandonment_raster <- terra::rast(abandonment_path)
 # (1 = 1 scenario of abandonment is happening, 4 = four scenarios of abandonment are happening)
-plot(abandon)
+plot(abandonment_raster)
 # Classify abandonment to present/absent
 rcl <- matrix(c(1,1,
                 2,1,
@@ -151,7 +208,7 @@ rcl <- matrix(c(1,1,
                 0,NA,
                 9,NA,
                 255, NA), ncol=2, byrow = T)
-aban_simple <- terra::classify(abandon, rcl)
+aban_simple <- terra::classify(abandonment_raster, rcl)
 plot(aban_simple)
 # Check crs, red and ext
 crs(aban_simple) == crs(ref_raster)             # Coordinate system
@@ -175,9 +232,15 @@ Benefits = potential carbons stock
 
 ```{r}
 
-# Potential carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
+# Path to the potential carbon (Walker et al. 2022)
+potential_carbon_path <- file.path(
+  data_raw_dir,
+  "Carbon_potential",
+  "Base_Pot_AGB_BGB_SOC_MgCha_500m.tif"
+)
+# Load the raster
+pot_carbon <- terra::rast(potential_carbon_path)
 
-pot_carbon <- terra::rast("path")
 crs(pot_carbon) == crs(ref_raster)             # Coordinate system
 res(pot_carbon) == res(ref_raster)             # Resolution
 ext(pot_carbon) == ext(ref_raster)             # Extent
@@ -188,12 +251,21 @@ plot(pot_carbon_masked)
 
 ```
 
-Calculation of the mass (stock) of carbon that could be stored in areas potentially abandoned (this calculation is independent from the maps)
+Calculation of the mass (stock) of carbon that could be stored in areas
+potentially abandoned (this calculation is independent from the maps)
 
 ```{r}
 
-## Import unrealized carbon (Walker 2022), data are available here https://doi.org/10.7910/DVN/DSDDQK 
-unr_carbon <- terra::rast("path")
+## Import unrealized carbon (Walker et al. 2022) 
+# Path to the unrealized carbon
+unr_carbon_path <- file.path(
+  data_raw_dir,
+  "Carbon_potential",
+  "Base_Unr_AGB_BGB_SOC_MgCha_500m.tif"
+)
+# Load the raster
+
+unr_carbon <- terra::rast(unr_carbon_path)
 crs(unr_carbon) == crs(ref_raster)             # Coordinate system
 res(unr_carbon) == res(ref_raster)             # Resolution
 ext(unr_carbon) == ext(ref_raster)             # Extent
@@ -242,18 +314,14 @@ Current = high effectivement mesh size
 
 # Connectivity
 
-# Load the file
-# Define import directory
-# Define the directory path
-directory_anth_meff <- "path"
-# List files for 2022 with .tif or .tiff extension
-meff_2022_file <- list.files(
-  path = directory_anth_meff,
-  pattern = "2022.*\\.tif[f]?$",  # matches .tif or .tiff
-  full.names = TRUE
+# Path to effective mesh size raster (connectivity indicator, 2022)
+anth_meff_path <- file.path(
+  data_raw_dir,
+  "Effective_mesh_size",
+  "ESA_CCI_AgriCities0_2022_roads_10km_mosaic.tiff"
 )
-# Import the raster
-meff_2022 <- rast(meff_2022_file)
+# Load the raster
+meff_2022 <- terra::rast(anth_meff_path)
 # Checks
 crs(meff_2022) == crs(ref_raster)             # Coordinate system
 res(meff_2022) == res(ref_raster)             # Resolution
@@ -276,6 +344,49 @@ Benefits = climate velocity
 
 ```{r}
 
+#The data is from WorldClim
+#The future temp. prediction is for 2061-2080 using the CMCC-ESM2 for ssp245 at 30S or 1km resolution
+#The historical temp. map is an average across 1970-2000, at 1km resolution 
+#Both data sets have been masked using a shapefile of Europe, since the original data consisted of the entire globe.
+
+# Historic climate
+# Path to file
+ClimateH_EU_path <- file.path(
+  data_raw_dir,
+  "Climate",
+  "Historic_climate_EU.tif"
+)
+# Load the raster
+ClimateH_EU <- terra::rast(ClimateH_EU_path)
+
+# Future climate
+# Path to file
+ClimateF_EU_path <- file.path(
+  data_raw_dir,
+  "Climate",
+  "Future_climate_EU.tif"
+)
+# Load the raster
+ClimateF_EU <- terra::rast(ClimateF_EU_path)
+
+# Project raster to EPSG: 3035, and set the resolution to 1000 x 1000 meters (1 km)
+ClimateH_EU_proj <- project(ClimateH_EU, "EPSG:3035", res = 1000)
+ClimateF_EU_proj <- project(ClimateF_EU, "EPSG:3035", res = 1000)
+
+#First, the temporal gradient is calculated.
+#The future prediction and the historical data is subtracted, and thereafter divided by the number of years the two layers span across
+#In this case a total of 80 years
+Temporal <- (ClimateF_EU_proj - ClimateH_EU_proj) / 80
+
+#Then the spatial gradient is estimated using the slope-function from 'terra'
+Spatial <- terra::terrain(ClimateH_EU_proj, v='slope', neighbors=8, unit='degrees')
+Spatial_01 <- Spatial + 0.0001
+
+#Calculate CCV and save raster
+CVV <- Temporal / Spatial_01
+plot(CVV)
+writeRaster(CVV, "File Directory/CCV_new.tif", overwrite = TRUE)
+
 # Climate velocity
 
 cv <- terra::rast("path")
@@ -297,26 +408,41 @@ plot(cv_masked)
 
 **3.1 Determining the expansion probability of large mammals**
 
-We are using the wildlife maps from the Rewild Europe Report (Fernández, N., Torres, A., Wolf, F., Quintero, L., & Pereira, H. M. (2020). Boosting Ecological Restoration for a Wilder Europe. Halle-Wittenberg: German Centre for Integrative Biodiversity Research (iDiv) and Martin-Luther-Universität.)
+We are using the wildlife maps from the Rewild Europe Report (Fernández,
+N., Torres, A., Wolf, F., Quintero, L., & Pereira, H. M. (2020).
+Boosting Ecological Restoration for a Wilder Europe. Halle-Wittenberg:
+German Centre for Integrative Biodiversity Research (iDiv) and
+Martin-Luther-Universität.)
 
-They include Alpine ibex, Brown bear, Chamois, Elk, European bison, European lynx, European wolf, Iberian ibex, Iberian lynx, Pyrenean chamois, Red deer, Reindeer, Roe deer, Wild boar, Wild goat.
-We will focus on Brown bear, Elk, European bison, European wolf, European lynx, Iberian lynx, Iberian ibex, Alpine ibex.
+They include Alpine ibex, Brown bear, Chamois, Elk, European bison,
+European lynx, European wolf, Iberian ibex, Iberian lynx, Pyrenean
+chamois, Red deer, Reindeer, Roe deer, Wild boar, Wild goat. We will
+focus on Brown bear, Elk, European bison, European wolf, European lynx,
+Iberian lynx, Iberian ibex, Alpine ibex.
 
-We want to know the probability that cells not containing the focus species will gain that species. Here are the different steps.
-For each species
-1) Occurrences are coded as 0 = species absent, 1 = species present and 9 = species maybe present. We are changing all the 9 into 0.
-2) Get the distance of every 0 to the closest 1
-3) Calculate probability of colonization (form K/e^-xdistance)
-Then
-4) Sum the probability (Optional)
+We want to know the probability that cells not containing the focus
+species will gain that species. Here are the different steps. For each
+species 1) Occurrences are coded as 0 = species absent, 1 = species
+present and 9 = species maybe present. We are changing all the 9 into 0.
+2) Get the distance of every 0 to the closest 1 3) Calculate probability
+of colonization (form K/e\^-xdistance) Then 4) Sum the probability
+(Optional)
 
-A parallel processing was added to rasterize the data directly and change the resolution from 10km to 1km, and calculate distance then.
+A parallel processing was added to rasterize the data directly and
+change the resolution from 10km to 1km, and calculate distance then.
 
 Import and check data; change to binary
 
 ```{r}
 
-SPECIES_OCC_initial_fishnet <-  st_read("S:/Magali_Weissgerber/Species_dist_occ_scratch/SP_OCC_HIST_2019report/SP_OCCU_190207.shp")
+# Path to file
+SPECIES_OCC_initial_path <- file.path(
+  data_raw_dir,
+  "Large_mammals_distribution",
+  "SP_OCCU_190207.shp"
+)
+# Load the shapefile
+SPECIES_OCC_initial_fishnet <- st_read(SPECIES_OCC_initial_path)
 
 head(SPECIES_OCC_initial_fishnet)
 names(SPECIES_OCC_initial_fishnet)
@@ -340,10 +466,15 @@ ggplot(SPECIES_OCC_binary_fishnet) +
 
 Rasterize, create distance raster and calculate probability of expansion
 
-Calculate probability of colonization (form K/e^-xdistance) (when distance = 0 it means the species is already there so probability is also 0). 
-Initially we used 1/exp((log(2)/50) distance) so to have 50% of probability of comeback at 50km. But based on Canis lupus dispersal values we apply rather 1/exp((log(2)/60) distance) (as the cells of the mammals distribution are 10x10km the probability max is 0.89)
+Calculate probability of colonization (form K/e\^-xdistance) (when
+distance = 0 it means the species is already there so probability is
+also 0). Initially we used 1/exp((log(2)/50) distance) so to have 50% of
+probability of comeback at 50km. But based on Canis lupus dispersal
+values we apply rather 1/exp((log(2)/60) distance) (as the cells of the
+mammals distribution are 10x10km the probability max is 0.89)
 
-First, we rasterize the shapefile. It becomes a stack raster with the 8 species of interest
+First, we rasterize the shapefile. It becomes a stack raster with the 8
+species of interest
 
 ```{r}
 
@@ -390,7 +521,8 @@ plot(raster_1km_wildlife_occupancy_stack)
 
 ```
 
-Now we produce the distance raster for each species (depending on processing power it can take multiple hours per species to process)
+Now we produce the distance raster for each species (depending on
+processing power it can take multiple hours per species to process)
 
 ```{r}
 # 1. Set output directory here
@@ -528,7 +660,8 @@ masked_rasters$dist_CAPIBE
 masked_rasters$dist_CAPPYR
 ```
 
-Then, calculate probability for expansion (based on the distance, which is the minimum distance of each 0 cell (=absence) to)
+Then, calculate probability for expansion (based on the distance, which
+is the minimum distance of each 0 cell (=absence) to)
 
 ```{r}
 # Step 1: Define the transformation function
@@ -572,8 +705,12 @@ plot(species_probability_stack_2)
 
 **3.2 - determining social benefit**
 
-We look at people's willingness-To-Travel (WTT) to see wildlife.
-WTT is distributed among people, we use this distribution to determine the relation between distance to a cell and the share of people in the surrounding cells that will travel. Use the complementary lognormal CDF function (1 - CDF) and the density of people in a convolution to determine the amount of people going to one cell.
+We look at people's willingness-To-Travel (WTT) to see wildlife. WTT is
+distributed among people, we use this distribution to determine the
+relation between distance to a cell and the share of people in the
+surrounding cells that will travel. Use the complementary lognormal CDF
+function (1 - CDF) and the density of people in a convolution to
+determine the amount of people going to one cell.
 
 Prepare rasters
 
@@ -604,7 +741,6 @@ plot(raster_1km_wildlife_current_probability_stack)
 #raster_1km_wildlife_current_probability_stack$MP_sum <- app(raster_1km_wildlife_current_probability_stack, sum)
 #plot(raster_1km_wildlife_current_probability_stack)
 #Export
-#output_file_MP <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/SP_OCCU_current_probability_241212.tif")
 #writeRaster(raster_1km_wildlife_current_probability_stack, output_file_MP, overwrite=TRUE)
 
 # We look at people's willingness-To-Travel to see wildlife Possibility. In case some areas should be excluded (e.g. rural areas) we add a step of creating a new raster with a threshold of population density (threshold can be applied now, the current version has no threshold)
@@ -849,12 +985,12 @@ plot(convolved_raster_masked_LH,
      main = "Convolved Raster (Quantile Breaks) large herbivores")
 
 #Step 7: export
-#output_file_WTT_masked_LH <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_LH_raster_masked_241212.tif")
-#writeRaster(convolved_raster_masked_LH, output_file_WTT_masked_LH, overwrite=TRUE)
 
 ```
 
-for each cell multiply the wildlife status (current presence where cell value = 1 and comeback probability where cell value is between 0 and 1) with the sum of people travelling
+for each cell multiply the wildlife status (current presence where cell
+value = 1 and comeback probability where cell value is between 0 and 1)
+with the sum of people travelling
 
 ```{r}
 
@@ -873,12 +1009,12 @@ WTT_occ_proba_SB_stack <- c(convolved_raster_masked_LC, convolved_raster_masked_
 names(WTT_occ_proba_SB_stack)[1:2] <- c("WTT_LC", "WTT_LH")
 plot(WTT_occ_proba_SB_stack)
 
-#output_WTT_occ_proba_SB_stack <- ("S:/Magali_Weissgerber/Species raster for social benefit of rewilding/WTT_occ_proba_SB_stack_250912.tif")
 #writeRaster(WTT_occ_proba_SB_stack, output_WTT_occ_proba_SB_stack, overwrite=TRUE)
 
 ```
 
-Clean data for Social benefits map: number of people travelling, current mammals' distribution, potential future mammals' distribution
+Clean data for Social benefits map: number of people travelling, current
+mammals' distribution, potential future mammals' distribution
 
 ```{r}
 
@@ -910,17 +1046,32 @@ Import livestock distribution data
 
 # Import data
 
-cow_population_path <- "path"
-cow_population <- rast(cow_population_path)
-plot(cow_population)
+# Cow
+cow_population_path <- file.path(
+  data_raw_dir,
+  "Livestock",
+  "5_Ct_2015_Da.tif"
+)
+# Load the raster
+cow_population <- terra::rast(cow_population_path)
 
-goat_population_path <- "path"
-goat_population <- rast(goat_population_path)
-plot(goat_population)
+# Goat
+goat_population_path <- file.path(
+  data_raw_dir,
+  "Livestock",
+  "5_Gt_2015_Da.tif"
+)
+# Load the raster
+goat_population <- terra::rast(goat_population_path)
 
-sheep_population_path <- "path"
-sheep_population <- rast(sheep_population_path)
-plot(sheep_population)
+# Sheep
+sheep_population_path <- file.path(
+  data_raw_dir,
+  "Livestock",
+  "5_Sh_2015_Da.tif"
+)
+# Load the raster
+sheep_population <- terra::rast(sheep_population_path)
 
 livestock_rasters <- c(cow_population, goat_population, sheep_population)
 
@@ -955,8 +1106,13 @@ conflict_raster_sheep_sum[is.na(conflict_raster_sheep_sum)] <- 0
 
 ```
 
-An important livestock missing from the dataset are reindeers. However, there is not to my knowledge data on reindeer density in Europe, so I used the population estimations per country that I devided by the area reported for reindeers distribution.
-Source: Moen, J., Forbes, B. C., Löf, A., & Horstkotte, T. (2022). Tipping points and regime shifts in reindeer husbandry: A systems approach. In Reindeer Husbandry and Global Environmental Change. Routledge.
+An important livestock missing from the dataset are reindeers. However,
+there is not to my knowledge data on reindeer density in Europe, so I
+used the population estimations per country that I devided by the area
+reported for reindeers distribution. Source: Moen, J., Forbes, B. C.,
+Löf, A., & Horstkotte, T. (2022). Tipping points and regime shifts in
+reindeer husbandry: A systems approach. In Reindeer Husbandry and Global
+Environmental Change. Routledge.
 
 ```{r}
 
@@ -1047,8 +1203,10 @@ plot(conflict_raster_stack_complete)
 
 ```
 
-To visualize the conflicts we consider livestock and carnivores Canis lupus and Ursus arctos.
-Here are clean data for social conflicts: 1) livestock density, 2) current Canis lupus and Ursus arctos distribution, 3) potential Canis lupus and Ursus arctos distribution
+To visualize the conflicts we consider livestock and carnivores Canis
+lupus and Ursus arctos. Here are clean data for social conflicts: 1)
+livestock density, 2) current Canis lupus and Ursus arctos distribution,
+3) potential Canis lupus and Ursus arctos distribution
 
 ```{r}
 
@@ -1075,57 +1233,102 @@ plot(M_CN_UA_binary)
 
 ```
 
-**3.4: Export and import each layer so there is no need to process all the data each time**
+**3.4: Export and import each layer so there is no need to process all
+the data each time**
 
 ```{r}
 
-output_dir = "path"
-
 # Climate change mitigation
-  
-writeRaster(hanpp_masked, filename = file.path(output_dir, "layers_maps_hanpp_masked.tif"), overwrite = TRUE)
-hanpp_masked <- rast(file.path(output_dir, "layers_maps_hanpp_masked4.tif"))
 
-writeRaster(abandonment_masked, filename = file.path(output_dir, "layers_maps_abandonment_masked.tif"), overwrite = TRUE)
-abandonment_masked <- rast(file.path(output_dir, "layers_maps_abandonment_masked.tif"))
+writeRaster(
+  hanpp_masked,
+  filename = file.path(data_int_dir, "layers_maps_hanpp_masked.tif"),
+  overwrite = TRUE
+)
+hanpp_masked <- rast(file.path(data_int_dir, "layers_maps_hanpp_masked.tif"))
 
-writeRaster(pot_carbon_masked, filename = file.path(output_dir, "layers_maps_pot_carbon_masked.tif"), overwrite = TRUE)
-pot_carbon_masked <- rast(file.path(output_dir, "layers_maps_pot_carbon_masked4.tif"))
+writeRaster(
+  abandonment_masked,
+  filename = file.path(data_int_dir, "layers_maps_abandonment_masked.tif"),
+  overwrite = TRUE
+)
+abandonment_masked <- rast(file.path(data_int_dir, "layers_maps_abandonment_masked.tif"))
+
+writeRaster(
+  pot_carbon_masked,
+  filename = file.path(data_int_dir, "layers_maps_pot_carbon_masked.tif"),
+  overwrite = TRUE
+)
+pot_carbon_masked <- rast(file.path(data_int_dir, "layers_maps_pot_carbon_masked.tif"))
 
 # Climate change adaptation
 
-writeRaster(high_meff_masked, filename = file.path(output_dir, "layers_maps_high_meff_masked.tif"), overwrite = TRUE)
-high_meff_masked <- rast(file.path(output_dir, "layers_maps_high_meff_masked.tif"))
+writeRaster(
+  high_meff_masked,
+  filename = file.path(data_int_dir, "layers_maps_high_meff_masked.tif"),
+  overwrite = TRUE
+)
+high_meff_masked <- rast(file.path(data_int_dir, "layers_maps_high_meff_masked.tif"))
 
-writeRaster(cv_masked, filename = file.path(output_dir, "layers_maps_cv_masked.tif"), overwrite = TRUE)
-cv_masked <- rast(file.path(output_dir, "layers_maps_cv_masked.tif"))
+writeRaster(
+  cv_masked,
+  filename = file.path(data_int_dir, "layers_maps_cv_masked.tif"),
+  overwrite = TRUE
+)
+cv_masked <- rast(file.path(data_int_dir, "layers_maps_cv_masked.tif"))
 
 # Social benefits
 
-writeRaster(WTT_average, filename = file.path(output_dir, "layers_maps_WTT_average.tif"), overwrite = TRUE)
-WTT_average <- rast(file.path(output_dir, "layers_maps_WTT_average.tif"))
+writeRaster(
+  WTT_average,
+  filename = file.path(data_int_dir, "layers_maps_WTT_average.tif"),
+  overwrite = TRUE
+)
+WTT_average <- rast(file.path(data_int_dir, "layers_maps_WTT_average.tif"))
 
-writeRaster(M_sum_binary, filename = file.path(output_dir, "layers_maps_M_sum_binary.tif"), overwrite = TRUE)
-M_sum_binary <- rast(file.path(output_dir, "layers_maps_M_sum_binary.tif"))
+writeRaster(
+  M_sum_binary,
+  filename = file.path(data_int_dir, "layers_maps_M_sum_binary.tif"),
+  overwrite = TRUE
+)
+M_sum_binary <- rast(file.path(data_int_dir, "layers_maps_M_sum_binary.tif"))
 
-writeRaster(P_SUM_threshold, filename = file.path(output_dir, "layers_maps_P_SUM_threshold_260324.tif"), overwrite = TRUE)
-P_SUM_threshold <- rast(file.path(output_dir, "layers_maps_P_SUM_threshold.tif"))
+writeRaster(
+  P_SUM_threshold,
+  filename = file.path(data_int_dir, "layers_maps_P_SUM_threshold.tif"),
+  overwrite = TRUE
+)
+P_SUM_threshold <- rast(file.path(data_int_dir, "layers_maps_P_SUM_threshold.tif"))
 
-# Social Conflict
+# Social conflict
 
 livestock_sum <- conflict_raster_stack_complete$livestock_sum
-writeRaster(livestock_sum, filename = file.path(output_dir, "layers_maps_livestock_sum.tif"), overwrite = TRUE)
-livestock_sum <- rast(file.path(output_dir, "layers_maps_livestock_sum.tif"))
 
-writeRaster(M_CN_UA_binary, filename = file.path(output_dir, "layers_maps_M_CN_UA_binary.tif"), overwrite = TRUE)
-M_CN_UA_binary <- rast(file.path(output_dir, "layers_maps_M_CN_UA_binary.tif"))
+writeRaster(
+  livestock_sum,
+  filename = file.path(data_int_dir, "layers_maps_livestock_sum.tif"),
+  overwrite = TRUE
+)
+livestock_sum <- rast(file.path(data_int_dir, "layers_maps_livestock_sum.tif"))
 
-writeRaster(P_CN_UA_threshold, filename = file.path(output_dir, "layers_maps_P_CN_UA_threshold_260324.tif"), overwrite = TRUE)
-P_CN_UA_threshold <- rast(file.path(output_dir, "layers_maps_P_CN_UA_threshold.tif"))
+writeRaster(
+  M_CN_UA_binary,
+  filename = file.path(data_int_dir, "layers_maps_M_CN_UA_binary.tif"),
+  overwrite = TRUE
+)
+M_CN_UA_binary <- rast(file.path(data_int_dir, "layers_maps_M_CN_UA_binary.tif"))
+
+writeRaster(
+  P_CN_UA_threshold,
+  filename = file.path(data_int_dir, "layers_maps_P_CN_UA_threshold.tif"),
+  overwrite = TRUE
+)
+P_CN_UA_threshold <- rast(file.path(data_int_dir, "layers_maps_P_CN_UA_threshold.tif"))
 
 ```
 
-**II. map each data individually (to prepare the figure in supplementary materials)**
+**II. map each data individually (to prepare the figure in supplementary
+materials)**
 
 **1. Current**
 
@@ -1777,7 +1980,8 @@ ggsave(
 
 **III. produce the bivariate maps**
 
-Climate change mitigation (potential carbon x (abandonment and low land use intensity))
+Climate change mitigation (potential carbon x (abandonment and low land
+use intensity))
 
 ```{r}
 
@@ -1956,7 +2160,8 @@ ggsave(
 
 ```
 
-Climate change adaptation (climate velocity x (abandonment and effective mesh size))
+Climate change adaptation (climate velocity x (abandonment and effective
+mesh size))
 
 ```{r}
 
@@ -2126,7 +2331,8 @@ ggsave(
 
 ```
 
-Social benefits (people travelling x (species current distribution and potential distribution))
+Social benefits (people travelling x (species current distribution and
+potential distribution))
 
 ```{r}
 
@@ -2324,7 +2530,8 @@ ggsave(
 
 ```
 
-Social conflicts (livestock density x (carnivores current distribution and potential distribution))
+Social conflicts (livestock density x (carnivores current distribution
+and potential distribution))
 
 ```{r}
 
@@ -3038,7 +3245,8 @@ ggsave(
 
 ```
 
-**2. Determining benefits extent: distinguishing overlapping extent and exclusive extent** 
+**2. Determining benefits extent: distinguishing overlapping extent and
+exclusive extent**
 
 Climate change mitigation
 
@@ -3313,4 +3521,3 @@ ggsave(
 )
 
 ```
-
