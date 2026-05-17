@@ -525,9 +525,10 @@ Now we produce the distance raster for each species (depending on
 processing power it can take multiple hours per species to process)
 
 ```{r}
-# 1. Set output directory here
+# 1. Set output directory for intermediate distance rasters
 
-output_directory <- "S:/Magali_Weissgerber/Species_dist_occ_scratch/species_distance_260213"
+species_distance_dir <- file.path(data_int_dir, "species_distance")
+dir.create(species_distance_dir, recursive = TRUE, showWarnings = FALSE)
 
 # 2. Create list of species rasters
 
@@ -545,44 +546,44 @@ species_list <- list(
 # 3. Processing function
 
 process_and_export_species <- function(r, species_name, output_dir) {
-
+  
   tryCatch({
-
+    
     message("=======================================")
     message("Processing species: ", species_name)
-
+    
     # Step 1: Clean raster
     r_clean <- classify(r, matrix(c(NaN, NA), ncol = 2, byrow = TRUE))
     r_clean <- mask(r_clean, r_clean)
-
+    
     # Step 2: Extract presence cells
     pts <- as.points(r_clean, values = TRUE, na.rm = TRUE)
     pts <- pts[pts[[1]] == 1, ]
-
+    
     if (nrow(pts) == 0) {
       stop("No presence cells found.")
     }
-
+    
     # Step 3: Compute distance raster
     dist_r <- distance(r_clean, pts, unit = "km")
-
-    # Step 4: Export
+    
+    # Step 4: Export to data/intermediate/species_distance
     output_file <- file.path(
       output_dir,
       paste0("dist_", species_name, ".tif")
     )
-
+    
     writeRaster(dist_r, output_file, overwrite = TRUE)
-
+    
     message("Finished and exported: ", output_file)
-
+    
     return(TRUE)
-
+    
   }, error = function(e) {
-
+    
     message("ERROR in species ", species_name, ": ", e$message)
     return(FALSE)
-
+    
   })
 }
 
@@ -591,13 +592,13 @@ process_and_export_species <- function(r, species_name, output_dir) {
 results_status <- list()
 
 for (sp in names(species_list)) {
-
+  
   results_status[[sp]] <- process_and_export_species(
     r = species_list[[sp]],
     species_name = sp,
-    output_dir = output_directory
+    output_dir = species_distance_dir
   )
-
+  
 }
 
 # 5. Summary of processing
@@ -605,24 +606,32 @@ for (sp in names(species_list)) {
 message("=======================================")
 message("Processing summary:")
 print(results_status)
+
 ```
 
 Next, import the distance raster
 
 ```{r}
+# Import the distance rasters from data/intermediate/species_distance
+
 # 1. List species names
 
 species <- c("CANLUP", "ALCALC", "BISBON", "LYNLYN", "URSARC", "LYNPAR", "CAPIBE", "CAPPYR")
-# Directory where files were exported
-input_dir <- "S:/Magali_Weissgerber/Species_dist_occ_scratch/species_distance_260213"
+
+# Directory where intermediate distance rasters were exported
+species_distance_dir <- file.path(data_int_dir, "species_distance")
 
 # 2. Create a function: import + plot + mask + return
 
 import_and_mask_species <- function(species, input_dir, inland_raster) {
   
-  # Find the correct file automatically (matching species name)
-  file_pattern <- paste0("dist_", species, ".tif")
-  file_path <- list.files(input_dir, pattern = file_pattern, full.names = TRUE)
+  file_pattern <- paste0("dist_", species, "\\.tif$")
+  
+  file_path <- list.files(
+    input_dir,
+    pattern = file_pattern,
+    full.names = TRUE
+  )
   
   if (length(file_path) == 0) {
     stop("No file found for species: ", species)
@@ -646,15 +655,13 @@ import_and_mask_species <- function(species, input_dir, inland_raster) {
 masked_rasters <- lapply(
   species,
   import_and_mask_species,
-  input_dir = input_dir,
+  input_dir = species_distance_dir,
   inland_raster = inland_raster
 )
 
-# The list will be named for convenience:
 names(masked_rasters) <- paste0("dist_", species)
 
 # Check results
-
 masked_rasters$dist_LYNPAR
 masked_rasters$dist_CAPIBE
 masked_rasters$dist_CAPPYR
@@ -1117,10 +1124,31 @@ Environmental Change. Routledge.
 ```{r}
 
 # 1. Load herding polygon and inland raster
-herding_poly <- vect("path")
+
+herding_poly_path <- file.path(
+  data_raw_dir,
+  "Livestock",
+  "Reindeer",
+  "reindeer_distribution_polygon.shp"
+)
+
+# Load polygon shapefile
+herding_poly <- st_read(herding_poly_path, quiet = TRUE)
+
 plot(herding_poly)
+
 plot(inland_raster)
-countries <- vect("path")
+
+countries_path <- file.path(
+  data_raw_dir,
+  "Livestock",
+  "Reindeer",
+  "CountriesPanEURno500isl.shp"
+)
+
+# Load country shapefile
+countries <- st_read(countries_path, quiet = TRUE)
+
 plot(countries)
 
 # 2. Reproject vector data to match inland_raster
