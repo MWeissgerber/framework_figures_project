@@ -11,7 +11,7 @@ These spatial analyses are not formal optimization exercises and sometimes rely 
 These data and code allow to reproduce the figures 3 and 4 of the article, and figures of the supplementary materials. For more details on methods please refer to the .Rmd and to the supplementary materials. 
 
 
-Data can be downloaded at: [10.5281/zenodo.20265711]
+Data can be downloaded from [zenodo](10.5281/zenodo.20265711)
 When downloading, create a folder called "data" with two subfolders "raw" and "intermediate". Put all the data in "raw".
 
 1) Climate change mitigation
