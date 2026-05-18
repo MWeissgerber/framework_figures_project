@@ -12,7 +12,7 @@ These data and code allow to reproduce the figures 3 and 4 of the article, and f
 
 
 Data can be downloaded at: 10.5281/zenodo.20265711 
-Upload all this data to data/raw
+When downloading, create a folder called "data" with two subfolders "raw" and "intermediate". Put all the data in "raw".
 
 1) Climate change mitigation
 
