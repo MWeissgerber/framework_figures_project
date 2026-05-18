@@ -11,7 +11,7 @@ These spatial analyses are not formal optimization exercises and sometimes rely 
 These data and code allow to reproduce the figures 3 and 4 of the article, and figures of the supplementary materials. For more details on methods please refer to the .Rmd and to the supplementary materials. 
 
 
-Data can be downloaded at: 10.5281/zenodo.20265711 
+Data can be downloaded at: [10.5281/zenodo.20265711]
 When downloading, create a folder called "data" with two subfolders "raw" and "intermediate". Put all the data in "raw".
 
 1) Climate change mitigation
@@ -116,3 +116,9 @@ Goats https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/O
 4) General layers
 
 Along those datasets layers of countries borders, some European borders (we did not extend to Russia, Belarus, Ukraine, and Moldova) and coastlines.  
+
+
+
+
+
+Authors: Magali Weissgerber, Gavin Stark, Néstor Fernández, Laura C. Quintero-Uribe, Marek Giergiczny,  Nikolaj Rauff Poulsen, Nacho Villar, Bjorn Mols, Elisabeth S. Bakker, Angus Monro Smith, Georg Winkel, Diogo Alagador, José M. Rey-Benayas, Josep Maria Espelta, Miriam Selwyn, Lluís Brotons, Tatiana Kluvankova, Stanislava Brnkalakova, Judith Kloibhofer, Reinhard Prestele, Henrik G. Smith, Alba Lázaro-González, Robert Buitenwerf, Elena A. Pearce, Jens-Christian Svenning, Joana Santana, Pedro Beja, Francisco Moreira, Sven Wunder, Miroslav Svoboda, Vlado Vancura, Almut Arneth, Arndt Hampe, Henrique M. Pereira
