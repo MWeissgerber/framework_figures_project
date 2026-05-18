@@ -75,7 +75,6 @@ raster - Europe borders and coastlines
 # Step 1: Load the population raster and coastline shapefile
 raster_1km_human_population_path <- file.path(
   data_raw_dir,
-  "Human_population_density",
   "JRC_1K_POP_2018.tif"
 )
 # Read the 1km resolution raster
@@ -89,7 +88,6 @@ plot(raster_1km_human_population)
 # Import Europe's borders
 inland_shapefile_path <- file.path(
   data_raw_dir,
-  "Europe_inland",
   "europe_limit_from_nut3_dissolve.shp"
 )
 inland_shapefile <- st_read(inland_shapefile_path)
@@ -127,7 +125,6 @@ ref_raster <- raster_1km_human_population
 
 country_borders_path <- file.path(
   data_raw_dir,
-  "Country_borders",
   "CNTR_BN_01M_2016_3035_INLAND.shp"
 )
 country_borders_shapefile <- st_read(country_borders_path)
@@ -135,7 +132,6 @@ plot(country_borders_shapefile)
 
 coastlines_path <- file.path(
   data_raw_dir,
-  "Coastlines",
   "Europe_coastline.shp"
 )
 coastlines_shapefile <- st_read(coastlines_path)
@@ -156,7 +152,6 @@ Current = disturbance regime highly natural
 # Path to the HANPP raster (HANPP in percent of potential NPP for the year 2006)
 hanpp_path <- file.path(
   data_raw_dir,
-  "HANPP",
   "hanpp06gapf00.tif"
 )
 # Load the raster
@@ -193,7 +188,6 @@ Potential = abandonment
 # Path to the abandonment raster (Ceausu et al. 2015)
 abandonment_path <- file.path(
   data_raw_dir,
-  "Abandonment",
   "abandonment_scenarios_Ceausu_2015.tif"
 )
 # Load the raster
@@ -235,7 +229,6 @@ Benefits = potential carbons stock
 # Path to the potential carbon (Walker et al. 2022)
 potential_carbon_path <- file.path(
   data_raw_dir,
-  "Carbon_potential",
   "Base_Pot_AGB_BGB_SOC_MgCha_500m.tif"
 )
 # Load the raster
@@ -260,7 +253,6 @@ potentially abandoned (this calculation is independent from the maps)
 # Path to the unrealized carbon
 unr_carbon_path <- file.path(
   data_raw_dir,
-  "Carbon_potential",
   "Base_Unr_AGB_BGB_SOC_MgCha_500m.tif"
 )
 # Load the raster
@@ -317,7 +309,6 @@ Current = high effectivement mesh size
 # Path to effective mesh size raster (connectivity indicator, 2022)
 anth_meff_path <- file.path(
   data_raw_dir,
-  "Effective_mesh_size",
   "ESA_CCI_AgriCities0_2022_roads_10km_mosaic.tiff"
 )
 # Load the raster
@@ -353,7 +344,6 @@ Benefits = climate velocity
 # Path to file
 ClimateH_EU_path <- file.path(
   data_raw_dir,
-  "Climate",
   "Historic_climate_EU.tif"
 )
 # Load the raster
@@ -363,7 +353,6 @@ ClimateH_EU <- terra::rast(ClimateH_EU_path)
 # Path to file
 ClimateF_EU_path <- file.path(
   data_raw_dir,
-  "Climate",
   "Future_climate_EU.tif"
 )
 # Load the raster
@@ -438,7 +427,6 @@ Import and check data; change to binary
 # Path to file
 SPECIES_OCC_initial_path <- file.path(
   data_raw_dir,
-  "Large_mammals_distribution",
   "SP_OCCU_190207.shp"
 )
 # Load the shapefile
@@ -1056,7 +1044,6 @@ Import livestock distribution data
 # Cow
 cow_population_path <- file.path(
   data_raw_dir,
-  "Livestock",
   "5_Ct_2015_Da.tif"
 )
 # Load the raster
@@ -1065,7 +1052,6 @@ cow_population <- terra::rast(cow_population_path)
 # Goat
 goat_population_path <- file.path(
   data_raw_dir,
-  "Livestock",
   "5_Gt_2015_Da.tif"
 )
 # Load the raster
@@ -1074,7 +1060,6 @@ goat_population <- terra::rast(goat_population_path)
 # Sheep
 sheep_population_path <- file.path(
   data_raw_dir,
-  "Livestock",
   "5_Sh_2015_Da.tif"
 )
 # Load the raster
@@ -1127,8 +1112,6 @@ Environmental Change. Routledge.
 
 herding_poly_path <- file.path(
   data_raw_dir,
-  "Livestock",
-  "Reindeer",
   "reindeer_distribution_polygon.shp"
 )
 
@@ -1141,8 +1124,6 @@ plot(inland_raster)
 
 countries_path <- file.path(
   data_raw_dir,
-  "Livestock",
-  "Reindeer",
   "CountriesPanEURno500isl.shp"
 )
 
